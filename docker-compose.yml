@@ -1,0 +1,303 @@
+# Drykorn Vertragsmanagement - Docker Compose
+# ===========================================
+# Vereinfachte Konfiguration für internes Netzwerk (ohne Traefik)
+#
+# Verwendung:
+#   Staging:    docker compose --profile staging up -d
+#   Production: docker compose --profile prod up -d
+#   Stoppen:    docker compose --profile <staging|prod> down
+#
+# NICHT für Development - Development läuft lokal ohne Docker.
+
+x-common-env: &common-env
+  TZ: Europe/Berlin
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+networks:
+  drykorn-internal:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  keycloak-data:
+
+services:
+  # ============================================
+  # PostgreSQL 18 Datenbank
+  # ============================================
+  postgres:
+    image: postgres:18-alpine
+    container_name: drykorn-postgres
+    restart: unless-stopped
+    profiles: ["staging", "prod"]
+    environment:
+      <<: *common-env
+      POSTGRES_DB: ${DATABASE_NAME:-drykorn_contracts}
+      POSTGRES_USER: ${DATABASE_USER:-drykorn}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD ist erforderlich}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - drykorn-internal
+    # Nur intern erreichbar, kein Port nach außen
+    # Für Debug-Zugang: ports: ["5432:5432"] hinzufügen
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-drykorn} -d ${DATABASE_NAME:-drykorn_contracts}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Redis für Sessions und Caching
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: drykorn-redis
+    restart: unless-stopped
+    profiles: ["staging", "prod"]
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD ist erforderlich} --appendonly yes
+    environment:
+      <<: *common-env
+    volumes:
+      - redis-data:/data
+    networks:
+      - drykorn-internal
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+
+  # ============================================
+  # MinIO Object Storage (Dokumente)
+  # ============================================
+  minio:
+    image: minio/minio:latest
+    container_name: drykorn-minio
+    restart: unless-stopped
+    profiles: ["staging", "prod"]
+    command: server /data --console-address ":9001"
+    environment:
+      <<: *common-env
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY ist erforderlich}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY ist erforderlich}
+    volumes:
+      - minio-data:/data
+    networks:
+      - drykorn-internal
+    # MinIO Console für Admins erreichbar
+    ports:
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+
+  # ============================================
+  # Keycloak Identity Server
+  # ============================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: drykorn-keycloak
+    restart: unless-stopped
+    profiles: ["staging", "prod"]
+    command: start --import-realm --http-enabled=true --hostname-strict=false
+    environment:
+      <<: *common-env
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${DATABASE_NAME:-drykorn_contracts}
+      KC_DB_USERNAME: ${DATABASE_USER:-drykorn}
+      KC_DB_PASSWORD: ${DATABASE_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_PROXY: none
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD ist erforderlich}
+    volumes:
+      - ./infrastructure/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - keycloak-data:/opt/keycloak/data
+    networks:
+      - drykorn-internal
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q '200 OK'"]
+      start_period: 60s
+
+  # ============================================
+  # NestJS Backend API - STAGING
+  # ============================================
+  api-staging:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+      args:
+        NODE_ENV: staging
+    container_name: drykorn-api-staging
+    restart: unless-stopped
+    profiles: ["staging"]
+    environment:
+      <<: *common-env
+      NODE_ENV: staging
+      DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-drykorn-contracts}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-drykorn-contracts}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-contract-management}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET ist erforderlich}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY ist erforderlich}
+      API_PORT: "3001"
+      LOG_LEVEL: debug
+      CORS_ORIGINS: http://${SERVER_IP:-localhost}:3000
+    networks:
+      - drykorn-internal
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/health"]
+
+  # ============================================
+  # NestJS Backend API - PRODUCTION
+  # ============================================
+  api-prod:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+      args:
+        NODE_ENV: production
+    container_name: drykorn-api-prod
+    restart: unless-stopped
+    profiles: ["prod"]
+    environment:
+      <<: *common-env
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-drykorn-contracts}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-drykorn-contracts}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-contract-management}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET ist erforderlich}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY ist erforderlich}
+      API_PORT: "4001"
+      LOG_LEVEL: warn
+      CORS_ORIGINS: http://${SERVER_IP:-localhost}:4000
+    networks:
+      - drykorn-internal
+    ports:
+      - "4001:4001"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "curl", "-f", "http://localhost:4001/api/v1/health"]
+
+  # ============================================
+  # Next.js Frontend - STAGING
+  # ============================================
+  web-staging:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      args:
+        NODE_ENV: staging
+        NEXT_PUBLIC_API_URL: http://${SERVER_IP:-localhost}:3001/api/v1
+        NEXT_PUBLIC_KEYCLOAK_URL: http://${SERVER_IP:-localhost}:8080
+        NEXT_PUBLIC_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-drykorn-contracts}
+        NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-contract-management}
+    container_name: drykorn-web-staging
+    restart: unless-stopped
+    profiles: ["staging"]
+    environment:
+      <<: *common-env
+      NODE_ENV: staging
+    networks:
+      - drykorn-internal
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api-staging
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+
+  # ============================================
+  # Next.js Frontend - PRODUCTION
+  # ============================================
+  web-prod:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      args:
+        NODE_ENV: production
+        NEXT_PUBLIC_API_URL: http://${SERVER_IP:-localhost}:4001/api/v1
+        NEXT_PUBLIC_KEYCLOAK_URL: http://${SERVER_IP:-localhost}:8080
+        NEXT_PUBLIC_KEYCLOAK_REALM: ${KEYCLOAK_REALM:-drykorn-contracts}
+        NEXT_PUBLIC_KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-contract-management}
+    container_name: drykorn-web-prod
+    restart: unless-stopped
+    profiles: ["prod"]
+    environment:
+      <<: *common-env
+      NODE_ENV: production
+    networks:
+      - drykorn-internal
+    ports:
+      - "4000:3000"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    depends_on:
+      - api-prod
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]

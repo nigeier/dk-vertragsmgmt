@@ -1,41 +1,100 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ===========================================
+# Drykorn Vertragsmanagement - Git Ignore
+# ===========================================
 
-# dependencies
-/node_modules
-/.pnp
+# ----------------- Dependencies -----------------
+node_modules/
+.pnp
+.pnp.js
 .pnp.*
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
+!.yarn/sdks
 !.yarn/versions
 
-# testing
-/coverage
+# ----------------- Build Output -----------------
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
 
-# next.js
-/.next/
-/out/
+# ----------------- Testing -----------------
+coverage/
+.nyc_output/
 
-# production
-/build
+# ----------------- Environment -----------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging
+.env.production
 
-# misc
+# ----------------- IDE & Editor -----------------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ----------------- OS -----------------
 .DS_Store
-*.pem
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# debug
+# ----------------- Logs -----------------
+logs/
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# ----------------- Security -----------------
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+credentials.json
+secrets/
 
-# vercel
+# ----------------- Database -----------------
+*.sqlite
+*.sqlite3
+*.db
+
+# ----------------- Prisma -----------------
+prisma/migrations/**/migration_lock.toml
+
+# ----------------- Docker -----------------
+docker-compose.override.yml
+
+# ----------------- Miscellaneous -----------------
 .vercel
+.turbo
+*.local
+.cache/
+.temp/
+tmp/
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# ----------------- Generated -----------------
+generated/
+prisma/client/

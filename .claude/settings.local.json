@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm audit:*)",
+      "Bash(docker compose:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

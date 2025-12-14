@@ -1,0 +1,232 @@
+{
+  "id": "drykorn-contracts",
+  "realm": "drykorn-contracts",
+  "displayName": "Drykorn Vertragsmanagement",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and specialChars(1) and digits(1) and notUsername() and passwordHistory(5)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA256",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "defaultSignatureAlgorithm": "RS256",
+  "accessTokenLifespan": 900,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanLogin": 1800,
+  "accessCodeLifespanUserAction": 300,
+  "actionTokenGeneratedByAdminLifespan": 43200,
+  "actionTokenGeneratedByUserLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Administrator mit vollem Zugriff",
+        "composite": false
+      },
+      {
+        "name": "MANAGER",
+        "description": "Manager für Verträge und Reports",
+        "composite": false
+      },
+      {
+        "name": "USER",
+        "description": "Standardbenutzer",
+        "composite": false
+      },
+      {
+        "name": "VIEWER",
+        "description": "Nur Lesezugriff",
+        "composite": false
+      }
+    ],
+    "client": {
+      "contract-management": [
+        {
+          "name": "contracts:read",
+          "description": "Verträge lesen"
+        },
+        {
+          "name": "contracts:write",
+          "description": "Verträge erstellen/bearbeiten"
+        },
+        {
+          "name": "contracts:delete",
+          "description": "Verträge löschen"
+        },
+        {
+          "name": "contracts:approve",
+          "description": "Verträge genehmigen"
+        },
+        {
+          "name": "documents:read",
+          "description": "Dokumente lesen"
+        },
+        {
+          "name": "documents:write",
+          "description": "Dokumente hochladen"
+        },
+        {
+          "name": "documents:delete",
+          "description": "Dokumente löschen"
+        },
+        {
+          "name": "users:read",
+          "description": "Benutzer lesen"
+        },
+        {
+          "name": "users:write",
+          "description": "Benutzer verwalten"
+        },
+        {
+          "name": "reports:read",
+          "description": "Berichte lesen"
+        },
+        {
+          "name": "reports:export",
+          "description": "Berichte exportieren"
+        },
+        {
+          "name": "audit:read",
+          "description": "Audit-Log lesen"
+        },
+        {
+          "name": "settings:read",
+          "description": "Einstellungen lesen"
+        },
+        {
+          "name": "settings:write",
+          "description": "Einstellungen ändern"
+        }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "contract-management",
+      "name": "Drykorn Contract Management",
+      "description": "Vertragsmanagement-System für Drykorn",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "https://*.drykorn.local/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "https://*.drykorn.local"
+      ],
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    }
+  ],
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40,
+      "config": {}
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@drykorn.de",
+      "firstName": "System",
+      "lastName": "Administrator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ChangeMe123!",
+          "temporary": true
+        }
+      ],
+      "realmRoles": ["ADMIN"],
+      "clientRoles": {
+        "contract-management": [
+          "contracts:read",
+          "contracts:write",
+          "contracts:delete",
+          "contracts:approve",
+          "documents:read",
+          "documents:write",
+          "documents:delete",
+          "users:read",
+          "users:write",
+          "reports:read",
+          "reports:export",
+          "audit:read",
+          "settings:read",
+          "settings:write"
+        ]
+      }
+    }
+  ],
+  "smtpServer": {},
+  "internationalizationEnabled": true,
+  "supportedLocales": ["de", "en"],
+  "defaultLocale": "de",
+  "browserFlow": "browser",
+  "registrationFlow": "registration",
+  "directGrantFlow": "direct grant",
+  "resetCredentialsFlow": "reset credentials",
+  "clientAuthenticationFlow": "clients"
+}

@@ -1,0 +1,110 @@
+# Drykorn Vertragsmanagement - Lokale Entwicklung
+# ================================================
+# Startet NUR die Infrastruktur-Services (DB, Redis, etc.)
+# Die Apps (Web, API) laufen lokal mit npm run dev:all
+#
+# Verwendung:
+#   docker compose -f docker-compose.dev.yml up -d
+#   npm run dev:all
+
+services:
+  # PostgreSQL 18
+  postgres:
+    image: postgres:18-alpine
+    container_name: drykorn-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: drykorn_contracts
+      POSTGRES_USER: drykorn
+      POSTGRES_PASSWORD: drykorn_dev_123
+      TZ: Europe/Berlin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drykorn -d drykorn_contracts"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: drykorn-dev-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MinIO (Dokumentenspeicher)
+  minio:
+    image: minio/minio:latest
+    container_name: drykorn-dev-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-dev-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # MinIO Bucket Setup (einmalig)
+  minio-setup:
+    image: minio/mc:latest
+    container_name: drykorn-dev-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin123;
+      mc mb local/drykorn-contracts --ignore-existing;
+      mc anonymous set private local/drykorn-contracts;
+      echo 'Bucket drykorn-contracts created';
+      exit 0;
+      "
+
+  # Keycloak (optional - für Auth-Tests)
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: drykorn-dev-keycloak
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./infrastructure/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+      - keycloak-dev-data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  postgres-dev-data:
+  redis-dev-data:
+  minio-dev-data:
+  keycloak-dev-data:

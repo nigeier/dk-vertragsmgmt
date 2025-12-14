@@ -1,0 +1,40 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyPublicAccess",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::drykorn-contracts",
+        "arn:aws:s3:::drykorn-contracts/*"
+      ],
+      "Condition": {
+        "Bool": {
+          "aws:SecureTransport": "false"
+        }
+      }
+    },
+    {
+      "Sid": "AllowServiceAccess",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": ["arn:aws:iam::ACCOUNT:user/drykorn-api"]
+      },
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::drykorn-contracts",
+        "arn:aws:s3:::drykorn-contracts/*"
+      ]
+    }
+  ]
+}
