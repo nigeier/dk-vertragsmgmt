@@ -1,13 +1,4 @@
-import {
-  IsOptional,
-  IsString,
-  IsNumber,
-  IsArray,
-  IsEnum,
-  IsUUID,
-  Min,
-  Max,
-} from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsArray, IsEnum, IsUUID, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
 import { ContractStatus, ContractType } from '@prisma/client';
@@ -29,7 +20,9 @@ export class ContractFilterDto {
   @IsArray()
   @IsEnum(ContractStatus, { each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? (value as ContractStatus[]) : [value as ContractStatus],
+  )
   status?: ContractStatus[];
 
   @ApiPropertyOptional({
@@ -40,7 +33,9 @@ export class ContractFilterDto {
   @IsArray()
   @IsEnum(ContractType, { each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? (value as ContractType[]) : [value as ContractType],
+  )
   type?: ContractType[];
 
   @ApiPropertyOptional({

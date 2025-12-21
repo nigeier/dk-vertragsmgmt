@@ -5,6 +5,7 @@
 ## Kritische Regeln
 
 ### IMMER tun
+
 - Alle Inputs validieren (Backend: class-validator, Frontend: Zod)
 - Audit-Logging bei allen Datenänderungen
 - TypeScript strict mode verwenden
@@ -13,6 +14,7 @@
 - Neue API-Endpunkte in Swagger dokumentieren
 
 ### NIEMALS tun
+
 - Secrets/Passwörter in Code committen
 - `any` Type verwenden (wenn unvermeidbar: `unknown` mit Type Guard)
 - Raw SQL Queries ohne Parametrisierung
@@ -32,22 +34,19 @@
         ┌───────────────────────────┼───────────────────────────┐
         │                           │                           │
    ┌─────────┐               ┌─────────┐               ┌─────────┐
-   │   Web   │               │   API   │               │Keycloak │
-   │ :3000/  │               │ :3001/  │               │  :8080  │
+   │   Web   │               │   API   │               │Postgres │
+   │ :3000/  │──────────────►│ :3001/  │──────────────►│  :5432  │
    │ :4000   │               │ :4001   │               │         │
    └─────────┘               └─────────┘               └─────────┘
-        │                           │
-        │                    ┌──────┴──────┐
-        │                    │             │
-        │              ┌─────────┐   ┌─────────┐   ┌─────────┐
-        │              │Postgres │   │  Redis  │   │  MinIO  │
-        │              │ (intern)│   │ (intern)│   │  :9001  │
-        │              └─────────┘   └─────────┘   └─────────┘
-        │
-        └──────────────► API Calls (HTTP/JSON)
+                                    │
+                             ┌──────┴──────┐
+                             │  Lokaler    │
+                             │  Speicher   │
+                             │ ./data/docs │
+                             └─────────────┘
 ```
 
-**Kein Traefik, kein Reverse Proxy** - Direkter Zugriff über Ports.
+**Kein Docker für lokale Entwicklung** - Direkter Zugriff auf PostgreSQL.
 
 ## Projektstruktur
 
@@ -68,14 +67,13 @@ drykorn-vertragsmanagement/
 │       └── src/
 │           ├── common/         # Guards, Interceptors
 │           ├── modules/        # Feature-Module
-│           │   ├── auth/       # Keycloak-Integration
+│           │   ├── auth/       # JWT-Authentifizierung
 │           │   ├── contracts/  # Vertragsverwaltung
-│           │   ├── documents/  # Dokumente (MinIO)
+│           │   ├── documents/  # Dokumente (lokaler Speicher)
 │           │   └── audit-log/  # Audit-Trail
 │           └── prisma/         # Prisma Service
 │
 ├── packages/shared/            # Geteilte Types, Constants
-├── infrastructure/             # Keycloak, PostgreSQL, MinIO
 └── docs/                       # Dokumentation
 ```
 
@@ -118,28 +116,26 @@ docker compose --profile prod logs -f api-prod
 
 ### Port-Übersicht
 
-| Service | Development | Staging | Production |
-|---------|-------------|---------|------------|
-| Frontend | localhost:3000 | :3000 | :4000 |
-| API | localhost:3001 | :3001 | :4001 |
-| Keycloak | localhost:8080 | :8080 | :8080 |
-| MinIO Console | localhost:9001 | :9001 | :9001 |
+| Service    | Development    | Staging | Production |
+| ---------- | -------------- | ------- | ---------- |
+| Frontend   | localhost:3000 | :3000   | :4000      |
+| API        | localhost:3001 | :3001   | :4001      |
+| PostgreSQL | localhost:5432 | :5432   | :5432      |
 
 ## Tech-Stack
 
-| Bereich | Technologie |
-|---------|-------------|
-| Frontend | Next.js 14 (App Router) |
-| UI | shadcn/ui + Tailwind |
-| State | TanStack Query |
-| Forms | React Hook Form + Zod |
-| Backend | NestJS |
-| ORM | Prisma |
-| Validation | class-validator |
-| Auth | Keycloak (OIDC) |
-| DB | PostgreSQL 18 |
-| Storage | MinIO (S3) |
-| Cache | Redis |
+| Bereich    | Technologie                           |
+| ---------- | ------------------------------------- |
+| Frontend   | Next.js 14 (App Router)               |
+| UI         | shadcn/ui + Tailwind                  |
+| State      | TanStack Query                        |
+| Forms      | React Hook Form + Zod                 |
+| Backend    | NestJS                                |
+| ORM        | Prisma                                |
+| Validation | class-validator                       |
+| Auth       | JWT + bcrypt (eigene Implementierung) |
+| DB         | PostgreSQL 18                         |
+| Storage    | Lokaler Dateispeicher                 |
 
 ## Code-Patterns
 
@@ -147,7 +143,7 @@ docker compose --profile prod logs -f api-prod
 
 ```typescript
 @Controller('api/v1/contracts')
-@UseGuards(KeycloakAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @ApiTags('Contracts')
 export class ContractsController {
   @Get()
@@ -184,7 +180,7 @@ export class CreateContractDto {
 export function useContracts() {
   return useQuery({
     queryKey: ['contracts'],
-    queryFn: () => apiClient.get('/contracts').then(res => res.data),
+    queryFn: () => apiClient.get('/contracts').then((res) => res.data),
   });
 }
 
@@ -213,13 +209,15 @@ const { register, handleSubmit } = useForm({
 ## Datenbank
 
 ### Haupt-Entitäten
-- **User** - Benutzer (sync mit Keycloak)
+
+- **User** - Benutzer (mit Passwort-Hash)
 - **Partner** - Vertragspartner
 - **Contract** - Verträge
-- **Document** - Dokumente (Files in MinIO)
+- **Document** - Dokumente (lokaler Speicher)
 - **AuditLog** - Audit-Trail
 
 ### Schema ändern
+
 ```bash
 # 1. apps/api/prisma/schema.prisma bearbeiten
 # 2. Migration erstellen
@@ -230,37 +228,59 @@ npm run db:migrate
 
 Base URL: `http://localhost:3001/api/v1`
 
-| Methode | Endpoint | Beschreibung |
-|---------|----------|--------------|
-| POST | /auth/login | Login |
-| GET | /contracts | Liste |
-| POST | /contracts | Erstellen |
-| GET | /contracts/:id | Details |
-| PATCH | /contracts/:id | Bearbeiten |
-| DELETE | /contracts/:id | Löschen |
-| POST | /documents/upload | Upload |
-| GET | /documents/:id/download | Download |
+### Authentifizierung
+
+| Methode | Endpoint              | Beschreibung                      |
+| ------- | --------------------- | --------------------------------- |
+| POST    | /auth/login           | Login (E-Mail + Passwort)         |
+| POST    | /auth/register        | Benutzer registrieren (nur Admin) |
+| POST    | /auth/refresh         | Token erneuern                    |
+| GET     | /auth/me              | Profil abrufen                    |
+| POST    | /auth/change-password | Passwort ändern                   |
+| POST    | /auth/logout          | Logout                            |
+
+### Verträge
+
+| Methode | Endpoint         | Beschreibung |
+| ------- | ---------------- | ------------ |
+| GET     | /contracts       | Liste        |
+| POST    | /contracts       | Erstellen    |
+| GET     | /contracts/:id   | Details      |
+| PUT     | /contracts/:id   | Bearbeiten   |
+| DELETE  | /contracts/:id   | Löschen      |
+| GET     | /contracts/stats | Statistiken  |
+
+### Dokumente
+
+| Methode | Endpoint                | Beschreibung |
+| ------- | ----------------------- | ------------ |
+| POST    | /documents/upload       | Upload       |
+| GET     | /documents/:id/download | Download     |
+| DELETE  | /documents/:id          | Löschen      |
 
 Swagger UI: `http://localhost:3001/api/docs`
 
 ## Rollen & Berechtigungen
 
-| Rolle | Verträge | Dokumente | Reports | Admin |
-|-------|----------|-----------|---------|-------|
-| ADMIN | Alles | Alles | Alles | Ja |
-| MANAGER | CRUD + Genehmigen | CRUD | Alle | Nein |
-| USER | Eigene | Eigene | Eigene | Nein |
-| VIEWER | Lesen | Lesen | Nein | Nein |
+| Rolle   | Verträge          | Dokumente | Reports | Admin |
+| ------- | ----------------- | --------- | ------- | ----- |
+| ADMIN   | Alles             | Alles     | Alles   | Ja    |
+| MANAGER | CRUD + Genehmigen | CRUD      | Alle    | Nein  |
+| USER    | Eigene            | Eigene    | Eigene  | Nein  |
+| VIEWER  | Lesen             | Lesen     | Nein    | Nein  |
 
 ## Sicherheit
 
 ### Request-Pipeline
+
 ```
 Request → Rate Limiter → Auth Guard → Role Guard → Validation → Controller
 ```
 
 ### Audit-Logging
+
 Automatisch via `AuditLogInterceptor`:
+
 - Wer (userId, IP)
 - Was (Action, Entity)
 - Wann (Timestamp)
@@ -271,35 +291,41 @@ Automatisch via `AuditLogInterceptor`:
 Wichtigste Variablen in `.env` / `.env.local`:
 
 ```bash
-# Server (nur Docker)
-SERVER_IP=192.168.1.100
-
 # Datenbank
-DATABASE_URL=postgresql://user:pass@localhost:5432/db
+DATABASE_URL=postgresql://drykorn:geheim123@localhost:5432/drykorn_vertragsmanagement
 
-# Auth
-KEYCLOAK_URL=http://localhost:8080
-JWT_SECRET=<min 32 Zeichen>
+# Auth (JWT)
+JWT_SECRET=<min 32 Zeichen, z.B. openssl rand -base64 32>
 
 # Storage
-MINIO_ACCESS_KEY=...
-MINIO_SECRET_KEY=...
+STORAGE_PATH=./data/documents
 ```
+
+### Test-Benutzer (nach Seed)
+
+| E-Mail             | Passwort  | Rolle   |
+| ------------------ | --------- | ------- |
+| admin@drykorn.de   | Admin123! | ADMIN   |
+| manager@drykorn.de | User123!  | MANAGER |
+| user@drykorn.de    | User123!  | USER    |
 
 ## Häufige Aufgaben
 
 ### Neuen API-Endpunkt
+
 1. DTO in `modules/[modul]/dto/`
 2. Service-Methode
 3. Controller-Route mit Swagger-Dekoratoren
 4. Test schreiben
 
 ### Neue Frontend-Seite
+
 1. Route in `app/(dashboard)/[route]/page.tsx`
 2. Komponente in `components/`
 3. Hook in `hooks/`
 
 ### Datenbankschema ändern
+
 1. `prisma/schema.prisma` bearbeiten
 2. `npm run db:migrate`
 3. Types werden automatisch aktualisiert

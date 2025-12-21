@@ -1,7 +1,11 @@
 import { SetMetadata } from '@nestjs/common';
 import { AuditAction } from '@prisma/client';
 import { Request } from 'express';
-import { AUDIT_LOG_KEY, SKIP_AUDIT_KEY, AuditLogMetadata } from '../interceptors/audit-log.interceptor';
+import {
+  AUDIT_LOG_KEY,
+  SKIP_AUDIT_KEY,
+  AuditLogMetadata,
+} from '../interceptors/audit-log.interceptor';
 
 /**
  * Mark a route for audit logging

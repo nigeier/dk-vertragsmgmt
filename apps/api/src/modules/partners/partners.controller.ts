@@ -11,25 +11,23 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  Req,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Request } from 'express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { PartnersService } from './partners.service';
 import { CreatePartnerDto } from './dto/create-partner.dto';
 import { UpdatePartnerDto } from './dto/update-partner.dto';
 import { PartnerFilterDto } from './dto/partner-filter.dto';
-import { KeycloakAuthGuard } from '../../common/guards/keycloak-auth.guard';
+import { JwtAuthGuard, AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { AuditCreate, AuditUpdate, AuditDelete } from '../../common/decorators/audit.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { SkipAudit } from '../../common/decorators/audit.decorator';
+import { getClientIp, getUserAgent } from '../../common/utils/request.utils';
 
-@ApiTags('partners')
+@ApiTags('Partners')
 @ApiBearerAuth('access-token')
-@UseGuards(KeycloakAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('partners')
 export class PartnersController {
   constructor(private readonly partnersService: PartnersService) {}
@@ -51,16 +49,24 @@ export class PartnersController {
   }
 
   @Post()
-  @AuditCreate('Partner')
+  @SkipAudit() // Audit wird im Service gehandhabt
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Create a new partner' })
   @ApiResponse({ status: 201, description: 'Partner created' })
-  async create(@Body() createPartnerDto: CreatePartnerDto) {
-    return this.partnersService.create(createPartnerDto);
+  async create(
+    @Body() createPartnerDto: CreatePartnerDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    return this.partnersService.create(createPartnerDto, {
+      user,
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
   }
 
   @Put(':id')
-  @AuditUpdate('Partner')
+  @SkipAudit() // Audit wird im Service gehandhabt
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Update a partner' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
@@ -69,19 +75,33 @@ export class PartnersController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updatePartnerDto: UpdatePartnerDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
   ) {
-    return this.partnersService.update(id, updatePartnerDto);
+    return this.partnersService.update(id, updatePartnerDto, {
+      user,
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
   }
 
   @Delete(':id')
-  @AuditDelete('Partner')
+  @SkipAudit() // Audit wird im Service gehandhabt
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Delete a partner' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Partner deleted' })
   @ApiResponse({ status: 404, description: 'Partner not found' })
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
-    await this.partnersService.remove(id);
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    await this.partnersService.remove(id, {
+      user,
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
   }
 }

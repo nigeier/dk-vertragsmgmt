@@ -1,9 +1,4 @@
-import {
-  PipeTransform,
-  Injectable,
-  ArgumentMetadata,
-  BadRequestException,
-} from '@nestjs/common';
+import { PipeTransform, Injectable, ArgumentMetadata, BadRequestException } from '@nestjs/common';
 import { validate, ValidationError } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 
@@ -17,7 +12,7 @@ export class StrictValidationPipe implements PipeTransform<unknown> {
     const object = plainToInstance(metatype, value, {
       enableImplicitConversion: true,
       excludeExtraneousValues: true,
-    });
+    }) as object;
 
     const errors = await validate(object, {
       whitelist: true,
@@ -29,7 +24,7 @@ export class StrictValidationPipe implements PipeTransform<unknown> {
       throw new BadRequestException(this.formatErrors(errors));
     }
 
-    return object;
+    return object as unknown;
   }
 
   private toValidate(metatype: new (...args: unknown[]) => unknown): boolean {

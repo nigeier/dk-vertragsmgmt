@@ -55,9 +55,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     // Log error details
-    this.logger.error(
-      `${request.method} ${request.url} - ${status} - ${JSON.stringify(message)}`,
-    );
+    this.logger.error(`${request.method} ${request.url} - ${status} - ${JSON.stringify(message)}`);
 
     response.status(status).json({
       statusCode: status,

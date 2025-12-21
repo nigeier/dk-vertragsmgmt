@@ -38,7 +38,9 @@ export class AuditLogFilterDto {
   @IsArray()
   @IsEnum(AuditAction, { each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? (value as AuditAction[]) : [value as AuditAction],
+  )
   action?: AuditAction[];
 
   @ApiPropertyOptional({

@@ -10,21 +10,15 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
-import { KeycloakAuthGuard, AuthenticatedUser } from '../../common/guards/keycloak-auth.guard';
+import { JwtAuthGuard, AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SkipAudit } from '../../common/decorators/audit.decorator';
 
-@ApiTags('notifications')
+@ApiTags('Notifications')
 @ApiBearerAuth('access-token')
-@UseGuards(KeycloakAuthGuard)
+@UseGuards(JwtAuthGuard)
 @SkipAudit()
 @Controller('notifications')
 export class NotificationsController {
@@ -33,10 +27,7 @@ export class NotificationsController {
   @Get()
   @ApiOperation({ summary: 'Get user notifications' })
   @ApiResponse({ status: 200, description: 'Notifications returned' })
-  async findAll(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('unreadOnly') unreadOnly?: string,
-  ) {
+  async findAll(@CurrentUser() user: AuthenticatedUser, @Query('unreadOnly') unreadOnly?: string) {
     return this.notificationsService.findAll(user, unreadOnly === 'true');
   }
 
@@ -51,10 +42,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Mark notification as read' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
-  async markAsRead(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async markAsRead(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.notificationsService.markAsRead(id, user);
   }
 
@@ -70,10 +58,7 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Delete a notification' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Notification deleted' })
-  async remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.notificationsService.remove(id, user);
   }
 }

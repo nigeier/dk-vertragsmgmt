@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import configuration from './config/configuration';
@@ -13,6 +14,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DeadlinesModule } from './modules/deadlines/deadlines.module';
+import { EmailModule } from './modules/email/email.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 @Module({
@@ -36,6 +38,9 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
       ],
     }),
 
+    // Scheduled Tasks
+    ScheduleModule.forRoot(),
+
     // Core Modules
     PrismaModule,
 
@@ -48,6 +53,7 @@ import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor
     AuditLogModule,
     NotificationsModule,
     DeadlinesModule,
+    EmailModule,
   ],
   providers: [
     // Global Rate Limiting Guard

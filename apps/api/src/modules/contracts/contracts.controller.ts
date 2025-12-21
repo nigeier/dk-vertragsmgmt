@@ -24,16 +24,17 @@ import {
 import { ContractsService } from './contracts.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
+import { UpdateContractStatusDto } from './dto/update-contract-status.dto';
+import { AssignContractDto } from './dto/assign-contract.dto';
 import { ContractFilterDto } from './dto/contract-filter.dto';
-import { KeycloakAuthGuard, AuthenticatedUser } from '../../common/guards/keycloak-auth.guard';
+import { JwtAuthGuard, AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { AuditCreate, AuditUpdate, AuditDelete, AuditRead } from '../../common/decorators/audit.decorator';
-import { ContractStatus } from '@prisma/client';
+import { AuditCreate, AuditRead, SkipAudit } from '../../common/decorators/audit.decorator';
 
-@ApiTags('contracts')
+@ApiTags('Contracts')
 @ApiBearerAuth('access-token')
-@UseGuards(KeycloakAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('contracts')
 export class ContractsController {
   constructor(private readonly contractsService: ContractsService) {}
@@ -44,10 +45,7 @@ export class ContractsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
-  async findAll(
-    @Query() filterDto: ContractFilterDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async findAll(@Query() filterDto: ContractFilterDto, @CurrentUser() user: AuthenticatedUser) {
     return this.contractsService.findAll(filterDto, user);
   }
 
@@ -60,12 +58,14 @@ export class ContractsController {
 
   @Get('expiring')
   @ApiOperation({ summary: 'Get contracts expiring within specified days' })
-  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Days until expiration (default: 30)' })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    type: Number,
+    description: 'Days until expiration (default: 30)',
+  })
   @ApiResponse({ status: 200, description: 'Expiring contracts returned' })
-  async getExpiring(
-    @Query('days') days: number = 30,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async getExpiring(@Query('days') days: number = 30, @CurrentUser() user: AuthenticatedUser) {
     return this.contractsService.getExpiring(days, user);
   }
 
@@ -75,10 +75,7 @@ export class ContractsController {
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Contract returned' })
   @ApiResponse({ status: 404, description: 'Contract not found' })
-  async findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.contractsService.findOne(id, user);
   }
 
@@ -96,7 +93,7 @@ export class ContractsController {
   }
 
   @Put(':id')
-  @AuditUpdate('Contract')
+  @SkipAudit() // Audit handled in service with oldValue capture
   @Roles('ADMIN', 'MANAGER', 'USER')
   @ApiOperation({ summary: 'Update a contract' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
@@ -111,32 +108,46 @@ export class ContractsController {
   }
 
   @Patch(':id/status')
-  @AuditUpdate('Contract')
+  @SkipAudit() // Audit handled in service with oldValue capture
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Update contract status' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Contract status updated' })
+  @ApiResponse({ status: 400, description: 'Ungültiger Status' })
   @ApiResponse({ status: 404, description: 'Contract not found' })
   async updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('status') status: ContractStatus,
+    @Body() dto: UpdateContractStatusDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.contractsService.updateStatus(id, status, user);
+    return this.contractsService.updateStatus(id, dto.status, user);
+  }
+
+  @Patch(':id/assign')
+  @SkipAudit() // Audit handled in service
+  @Roles('ADMIN', 'MANAGER')
+  @ApiOperation({ summary: 'Assign contract to a different user' })
+  @ApiParam({ name: 'id', type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Vertrag zugewiesen' })
+  @ApiResponse({ status: 403, description: 'Keine Berechtigung' })
+  @ApiResponse({ status: 404, description: 'Vertrag oder Benutzer nicht gefunden' })
+  async assign(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AssignContractDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.contractsService.assign(id, dto.ownerId, user, dto.reason);
   }
 
   @Delete(':id')
-  @AuditDelete('Contract')
+  @SkipAudit() // Audit handled in service with oldValue capture
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles('ADMIN', 'MANAGER')
   @ApiOperation({ summary: 'Delete a contract' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Contract deleted' })
   @ApiResponse({ status: 404, description: 'Contract not found' })
-  async remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.contractsService.remove(id, user);
   }
 }

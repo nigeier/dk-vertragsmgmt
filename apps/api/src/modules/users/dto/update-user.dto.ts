@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsOptional, MaxLength, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateUserDto {
@@ -28,4 +28,14 @@ export class UpdateUserDto {
   @IsOptional()
   @MaxLength(100)
   department?: string;
+
+  @ApiPropertyOptional({
+    description: 'User role',
+    enum: ['ADMIN', 'MANAGER', 'USER', 'VIEWER'],
+    example: 'USER',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['ADMIN', 'MANAGER', 'USER', 'VIEWER'], { message: 'Ungültige Rolle' })
+  role?: string;
 }

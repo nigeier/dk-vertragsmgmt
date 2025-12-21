@@ -26,13 +26,19 @@ export function Header(): React.JSX.Element {
 
   const { data: notificationCount } = useQuery<{ count: number }>({
     queryKey: ['notification-count'],
-    queryFn: () => api.get('/notifications/count').then((res) => res.data),
+    queryFn: async () => {
+      const response = await api.get<{ count: number }>('/notifications/count');
+      return response.data;
+    },
     refetchInterval: 60000, // Refresh every minute
   });
 
   const { data: notifications } = useQuery<Notification[]>({
     queryKey: ['notifications'],
-    queryFn: () => api.get('/notifications?unreadOnly=true').then((res) => res.data),
+    queryFn: async () => {
+      const response = await api.get<Notification[]>('/notifications?unreadOnly=true');
+      return response.data;
+    },
   });
 
   const markAsRead = async (id: string): Promise<void> => {
@@ -40,7 +46,7 @@ export function Header(): React.JSX.Element {
   };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
+    <header className="bg-card flex h-16 items-center justify-between border-b px-6">
       {/* Search */}
       <div className="flex items-center gap-4">
         {searchOpen ? (
@@ -68,7 +74,7 @@ export function Header(): React.JSX.Element {
             <Button variant="ghost" size="icon" className="relative">
               <Bell className="h-5 w-5" />
               {notificationCount && notificationCount.count > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs text-destructive-foreground">
+                <span className="bg-destructive text-destructive-foreground absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs">
                   {notificationCount.count > 9 ? '9+' : notificationCount.count}
                 </span>
               )}
@@ -84,17 +90,17 @@ export function Header(): React.JSX.Element {
                     onClick={() => markAsRead(notification.id)}
                   >
                     <span className="font-medium">{notification.title}</span>
-                    <span className="text-sm text-muted-foreground line-clamp-2">
+                    <span className="text-muted-foreground line-clamp-2 text-sm">
                       {notification.message}
                     </span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-muted-foreground text-xs">
                       {new Date(notification.createdAt).toLocaleDateString('de-DE')}
                     </span>
                   </DropdownMenuItem>
                 ))}
               </>
             ) : (
-              <div className="p-4 text-center text-muted-foreground">
+              <div className="text-muted-foreground p-4 text-center">
                 Keine neuen Benachrichtigungen
               </div>
             )}

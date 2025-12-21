@@ -26,6 +26,13 @@ export interface PaginationMeta {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+/**
+ * Erweiterte Pagination-Meta mit Navigation-Flags
+ * (für zukünftige Nutzung)
+ */
+export interface ExtendedPaginationMeta extends PaginationMeta {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
 }
@@ -42,6 +49,3 @@ export interface SearchQuery {
 }
 
 export type SortOrder = 'asc' | 'desc';
-
-export const DEFAULT_PAGE_SIZE = 20;
-export const MAX_PAGE_SIZE = 100;

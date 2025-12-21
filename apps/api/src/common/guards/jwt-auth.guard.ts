@@ -11,44 +11,21 @@ import { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ROLES_KEY } from '../decorators/roles.decorator';
+import { JwtPayload, AuthenticatedUser } from '../types/auth.types';
 
-interface KeycloakTokenPayload {
-  sub: string;
-  email: string;
-  preferred_username: string;
-  given_name: string;
-  family_name: string;
-  realm_access?: {
-    roles: string[];
-  };
-  resource_access?: {
-    [clientId: string]: {
-      roles: string[];
-    };
-  };
-  exp: number;
-  iat: number;
-}
-
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  username: string;
-  firstName: string;
-  lastName: string;
-  roles: string[];
-}
+// Re-export für einfacheren Import in anderen Modulen
+export { AuthenticatedUser } from '../types/auth.types';
 
 @Injectable()
-export class KeycloakAuthGuard implements CanActivate {
-  private readonly logger = new Logger(KeycloakAuthGuard.name);
+export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
 
   constructor(
     private reflector: Reflector,
     private configService: ConfigService,
   ) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     // Check if route is marked as public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
@@ -63,11 +40,11 @@ export class KeycloakAuthGuard implements CanActivate {
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
-      throw new UnauthorizedException('No authentication token provided');
+      throw new UnauthorizedException('Kein Authentifizierungs-Token vorhanden');
     }
 
     try {
-      const payload = await this.verifyToken(token);
+      const payload = this.verifyToken(token);
       const user = this.extractUserFromPayload(payload);
 
       // Attach user to request
@@ -82,18 +59,28 @@ export class KeycloakAuthGuard implements CanActivate {
       if (requiredRoles && requiredRoles.length > 0) {
         const hasRole = requiredRoles.some((role) => user.roles.includes(role));
         if (!hasRole) {
-          throw new UnauthorizedException('Insufficient permissions');
+          throw new UnauthorizedException('Unzureichende Berechtigungen');
         }
       }
 
       return true;
     } catch (error) {
-      this.logger.warn('Authentication failed', error);
-      throw new UnauthorizedException('Invalid or expired token');
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      this.logger.warn('Authentifizierung fehlgeschlagen', error);
+      throw new UnauthorizedException('Ungültiger oder abgelaufener Token');
     }
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {
+    // 1. Versuche zuerst den Token aus dem httpOnly Cookie zu lesen
+    const cookieToken = (request.cookies as Record<string, string> | undefined)?.['access_token'];
+    if (cookieToken) {
+      return cookieToken;
+    }
+
+    // 2. Fallback: Authorization Header (für API-Clients/Testing)
     const authHeader = request.headers.authorization;
     if (!authHeader) return undefined;
 
@@ -101,33 +88,24 @@ export class KeycloakAuthGuard implements CanActivate {
     return type === 'Bearer' ? token : undefined;
   }
 
-  private async verifyToken(token: string): Promise<KeycloakTokenPayload> {
+  private verifyToken(token: string): JwtPayload {
     const jwtSecret = this.configService.get<string>('JWT_SECRET');
 
     if (!jwtSecret) {
-      throw new Error('JWT_SECRET not configured');
+      throw new Error('JWT_SECRET nicht konfiguriert');
     }
 
-    // In production, you would verify against Keycloak's public key
-    // For now, we use a shared secret for development
-    return jwt.verify(token, jwtSecret) as KeycloakTokenPayload;
+    return jwt.verify(token, jwtSecret) as JwtPayload;
   }
 
-  private extractUserFromPayload(payload: KeycloakTokenPayload): AuthenticatedUser {
-    const clientId = this.configService.get<string>('KEYCLOAK_CLIENT_ID', 'contract-management');
-
-    // Collect roles from realm and resource access
-    const realmRoles = payload.realm_access?.roles || [];
-    const clientRoles = payload.resource_access?.[clientId]?.roles || [];
-    const roles = [...new Set([...realmRoles, ...clientRoles])];
-
+  private extractUserFromPayload(payload: JwtPayload): AuthenticatedUser {
     return {
       id: payload.sub,
       email: payload.email,
-      username: payload.preferred_username,
-      firstName: payload.given_name,
-      lastName: payload.family_name,
-      roles,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+      role: payload.role,
+      roles: [payload.role], // Single role als Array für @Roles() Kompatibilität
     };
   }
 }

@@ -1,22 +1,31 @@
-import { IsString, IsNotEmpty, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, MinLength, IsEmail, IsOptional, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class LoginDto {
   @ApiProperty({
-    description: 'Username or email',
-    example: 'user@drykorn.de',
+    description: 'E-Mail-Adresse',
+    example: 'benutzer@drykorn.de',
   })
-  @IsString()
-  @IsNotEmpty()
-  username: string;
+  @IsEmail({}, { message: 'Bitte gültige E-Mail-Adresse eingeben' })
+  @IsNotEmpty({ message: 'E-Mail ist erforderlich' })
+  email!: string;
 
   @ApiProperty({
-    description: 'Password',
-    example: 'SecurePassword123!',
+    description: 'Passwort',
+    example: 'SicheresPasswort123!',
     minLength: 8,
   })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(8)
-  password: string;
+  @IsNotEmpty({ message: 'Passwort ist erforderlich' })
+  @MinLength(8, { message: 'Passwort muss mindestens 8 Zeichen haben' })
+  password!: string;
+
+  @ApiPropertyOptional({
+    description: '2FA TOTP-Code (6 Ziffern)',
+    example: '123456',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{6}$/, { message: '2FA-Code muss genau 6 Ziffern enthalten' })
+  twoFactorCode?: string;
 }

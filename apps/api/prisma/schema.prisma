@@ -50,24 +50,76 @@ enum AuditAction {
 
 // ==================== MODELS ====================
 
+enum UserRole {
+  ADMIN
+  MANAGER
+  USER
+  VIEWER
+}
+
+enum UserStatus {
+  PENDING     // Wartet auf Admin-Freigabe
+  ACTIVE      // Freigeschaltet
+  REJECTED    // Abgelehnt
+}
+
 model User {
-  id            String    @id @default(uuid())
-  keycloakId    String    @unique @map("keycloak_id")
-  email         String    @unique
-  firstName     String    @map("first_name")
-  lastName      String    @map("last_name")
+  id            String      @id @default(uuid())
+  email         String      @unique
+  passwordHash  String      @map("password_hash")
+  firstName     String      @map("first_name")
+  lastName      String      @map("last_name")
+  role          UserRole    @default(USER)
+  status        UserStatus  @default(PENDING)  // Neu: Pending bis Admin freigibt
   department    String?
-  isActive      Boolean   @default(true) @map("is_active")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  isActive      Boolean     @default(true) @map("is_active")
+  lastLoginAt   DateTime?   @map("last_login_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  // Security: Login-Versuche und Lockout
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  lastFailedLoginAt   DateTime? @map("last_failed_login_at")
+
+  // 2FA (optional)
+  twoFactorSecret         String?   @map("two_factor_secret")
+  twoFactorEnabled        Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorFailedAttempts Int       @default(0) @map("two_factor_failed_attempts")
+  twoFactorLockedUntil    DateTime? @map("two_factor_locked_until")
 
   // Relations
   contracts         Contract[]      @relation("ContractOwner")
   createdContracts  Contract[]      @relation("ContractCreator")
   auditLogs         AuditLog[]
   notifications     Notification[]
+  deletedDocuments  Document[]      @relation("DocumentDeleter")
+  refreshTokens     RefreshToken[]
 
+  @@index([status])
   @@map("users")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Device/Session Info
+  userAgent   String?   @map("user_agent")
+  ipAddress   String?   @map("ip_address")
+
+  expiresAt   DateTime  @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+
+  // Revocation
+  revokedAt   DateTime? @map("revoked_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 model Partner {
@@ -148,12 +200,17 @@ model Document {
   originalName    String    @map("original_name")
   mimeType        String    @map("mime_type")
   size            Int
-  minioKey        String    @unique @map("minio_key")
+  storagePath     String    @unique @map("storage_path")  // Lokaler Dateipfad
   version         Int       @default(1)
   isMainDocument  Boolean   @default(false) @map("is_main_document")
   checksum        String    // SHA-256 für Integrität
 
   createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Soft Delete
+  deletedAt       DateTime? @map("deleted_at")
+  deletedById     String?   @map("deleted_by_id")
+  deletedBy       User?     @relation("DocumentDeleter", fields: [deletedById], references: [id])
 
   // Relations
   contractId      String    @map("contract_id")
@@ -161,6 +218,7 @@ model Document {
 
   auditLogs       AuditLog[]
 
+  @@index([deletedAt])
   @@map("documents")
 }
 

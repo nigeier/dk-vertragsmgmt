@@ -1,32 +1,32 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger, Inject } from '@nestjs/common';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { ContractFilterDto } from './dto/contract-filter.dto';
-import { AuthenticatedUser } from '../../common/guards/keycloak-auth.guard';
-import { Contract, ContractStatus, Prisma } from '@prisma/client';
+import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
+import { Contract, ContractStatus, ContractType, Prisma, AuditAction } from '@prisma/client';
+import { getClientIp, getUserAgent } from '../../common/utils/request.utils';
 
-interface ContractWithRelations extends Contract {
+export interface ContractWithRelations extends Contract {
   partner: { id: string; name: string };
   owner: { id: string; firstName: string; lastName: string };
   _count: { documents: number };
 }
 
-interface ContractStats {
+export interface ContractStats {
   total: number;
   byStatus: Record<ContractStatus, number>;
+  byType: Record<ContractType, number>;
   expiringIn30Days: number;
   expiringIn60Days: number;
   expiringIn90Days: number;
   totalValue: number;
 }
 
-interface PaginatedResult<T> {
+export interface PaginatedResult<T> {
   data: T[];
   meta: {
     total: number;
@@ -40,7 +40,11 @@ interface PaginatedResult<T> {
 export class ContractsService {
   private readonly logger = new Logger(ContractsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+    @Inject(REQUEST) private readonly request: Request,
+  ) {}
 
   /**
    * Get all contracts with filtering and pagination
@@ -77,19 +81,24 @@ export class ContractsService {
 
     // Non-admin users can only see their own contracts or contracts they own
     if (!user.roles.includes('ADMIN')) {
-      const dbUser = await this.getUserByKeycloakId(user.id);
-      where.OR = [
-        { ownerId: dbUser.id },
-        { createdById: dbUser.id },
-      ];
+      where.OR = [{ ownerId: user.id }, { createdById: user.id }];
     }
 
     // Build orderBy
-    const orderBy: Prisma.ContractOrderByWithRelationInput = {};
-    if (sortBy) {
-      orderBy[sortBy as keyof Prisma.ContractOrderByWithRelationInput] = sortOrder || 'desc';
-    } else {
-      orderBy.createdAt = 'desc';
+    let orderBy: Prisma.ContractOrderByWithRelationInput = { createdAt: 'desc' };
+    if (
+      sortBy &&
+      [
+        'title',
+        'createdAt',
+        'updatedAt',
+        'startDate',
+        'endDate',
+        'value',
+        'contractNumber',
+      ].includes(sortBy)
+    ) {
+      orderBy = { [sortBy]: sortOrder || 'desc' } as Prisma.ContractOrderByWithRelationInput;
     }
 
     const [contracts, total] = await Promise.all([
@@ -137,6 +146,9 @@ export class ContractsService {
         owner: {
           select: { id: true, firstName: true, lastName: true },
         },
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         documents: {
           orderBy: { createdAt: 'desc' },
         },
@@ -150,14 +162,13 @@ export class ContractsService {
     });
 
     if (!contract) {
-      throw new NotFoundException('Contract not found');
+      throw new NotFoundException('Vertrag nicht gefunden');
     }
 
     // Check access for non-admin users
     if (!user.roles.includes('ADMIN')) {
-      const dbUser = await this.getUserByKeycloakId(user.id);
-      if (contract.ownerId !== dbUser.id && contract.createdById !== dbUser.id) {
-        throw new ForbiddenException('Access denied');
+      if (contract.ownerId !== user.id && contract.createdById !== user.id) {
+        throw new ForbiddenException('Zugriff verweigert');
       }
     }
 
@@ -168,15 +179,13 @@ export class ContractsService {
    * Create a new contract
    */
   async create(dto: CreateContractDto, user: AuthenticatedUser): Promise<Contract> {
-    const dbUser = await this.getUserByKeycloakId(user.id);
-
     // Verify partner exists
     const partner = await this.prisma.partner.findUnique({
       where: { id: dto.partnerId },
     });
 
     if (!partner) {
-      throw new NotFoundException('Partner not found');
+      throw new NotFoundException('Partner nicht gefunden');
     }
 
     // Generate contract number
@@ -197,10 +206,10 @@ export class ContractsService {
         currency: dto.currency || 'EUR',
         paymentTerms: dto.paymentTerms,
         tags: dto.tags || [],
-        customFields: dto.customFields,
+        customFields: dto.customFields ? structuredClone(dto.customFields) : undefined,
         partnerId: dto.partnerId,
-        ownerId: dto.ownerId || dbUser.id,
-        createdById: dbUser.id,
+        ownerId: dto.ownerId || user.id,
+        createdById: user.id,
       },
       include: {
         partner: { select: { id: true, name: true } },
@@ -219,6 +228,24 @@ export class ContractsService {
   async update(id: string, dto: UpdateContractDto, user: AuthenticatedUser): Promise<Contract> {
     const existing = await this.findOne(id, user);
 
+    // Capture old values for audit log
+    const oldValue = {
+      title: existing.title,
+      description: existing.description,
+      type: existing.type,
+      status: existing.status,
+      startDate: existing.startDate,
+      endDate: existing.endDate,
+      noticePeriodDays: existing.noticePeriodDays,
+      autoRenewal: existing.autoRenewal,
+      value: existing.value,
+      currency: existing.currency,
+      paymentTerms: existing.paymentTerms,
+      tags: existing.tags,
+      partnerId: existing.partnerId,
+      ownerId: existing.ownerId,
+    };
+
     // Prevent updates to certain fields based on status
     if (
       existing.status === ContractStatus.ACTIVE &&
@@ -226,7 +253,7 @@ export class ContractsService {
       dto.status !== ContractStatus.ACTIVE &&
       dto.status !== ContractStatus.TERMINATED
     ) {
-      throw new ForbiddenException('Active contracts can only be terminated');
+      throw new ForbiddenException('Aktive Verträge können nur gekündigt werden');
     }
 
     const updated = await this.prisma.contract.update({
@@ -244,7 +271,7 @@ export class ContractsService {
         currency: dto.currency,
         paymentTerms: dto.paymentTerms,
         tags: dto.tags,
-        customFields: dto.customFields,
+        customFields: dto.customFields ? structuredClone(dto.customFields) : undefined,
         partnerId: dto.partnerId,
         ownerId: dto.ownerId,
       },
@@ -252,6 +279,19 @@ export class ContractsService {
         partner: { select: { id: true, name: true } },
         owner: { select: { id: true, firstName: true, lastName: true } },
       },
+    });
+
+    // Audit log with old and new values
+    await this.auditLogService.create({
+      action: AuditAction.UPDATE,
+      entityType: 'Contract',
+      entityId: id,
+      userId: user.id,
+      oldValue,
+      newValue: dto as Record<string, unknown>,
+      ipAddress: getClientIp(this.request),
+      userAgent: getUserAgent(this.request),
+      contractId: id,
     });
 
     this.logger.log(`Contract ${id} updated by ${user.email}`);
@@ -267,7 +307,8 @@ export class ContractsService {
     status: ContractStatus,
     user: AuthenticatedUser,
   ): Promise<Contract> {
-    await this.findOne(id, user);
+    const existing = await this.findOne(id, user);
+    const oldStatus = existing.status;
 
     const updated = await this.prisma.contract.update({
       where: { id },
@@ -278,7 +319,95 @@ export class ContractsService {
       },
     });
 
+    // Audit log for status change
+    await this.auditLogService.create({
+      action: AuditAction.UPDATE,
+      entityType: 'Contract',
+      entityId: id,
+      userId: user.id,
+      oldValue: { status: oldStatus },
+      newValue: { status },
+      ipAddress: getClientIp(this.request),
+      userAgent: getUserAgent(this.request),
+      contractId: id,
+    });
+
     this.logger.log(`Contract ${id} status changed to ${status} by ${user.email}`);
+
+    return updated;
+  }
+
+  /**
+   * Assign contract to a different user
+   */
+  async assign(
+    id: string,
+    newOwnerId: string,
+    user: AuthenticatedUser,
+    reason?: string,
+  ): Promise<Contract> {
+    // Only ADMIN and MANAGER can assign contracts
+    if (!user.roles.includes('ADMIN') && !user.roles.includes('MANAGER')) {
+      throw new ForbiddenException('Nur Administratoren und Manager können Verträge zuweisen');
+    }
+
+    const existing = await this.findOne(id, user);
+    const oldOwnerId = existing.ownerId;
+
+    // Verify the new owner exists and is active
+    const newOwner = await this.prisma.user.findUnique({
+      where: { id: newOwnerId },
+      select: { id: true, isActive: true, status: true, firstName: true, lastName: true },
+    });
+
+    if (!newOwner) {
+      throw new NotFoundException('Zielbenutzer nicht gefunden');
+    }
+
+    if (!newOwner.isActive || newOwner.status !== 'ACTIVE') {
+      throw new ForbiddenException('Zielbenutzer ist nicht aktiv');
+    }
+
+    // No change needed
+    if (oldOwnerId === newOwnerId) {
+      return existing;
+    }
+
+    const updated = await this.prisma.contract.update({
+      where: { id },
+      data: { ownerId: newOwnerId },
+      include: {
+        partner: { select: { id: true, name: true } },
+        owner: { select: { id: true, firstName: true, lastName: true, email: true } },
+        createdBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    // Audit log for assignment
+    await this.auditLogService.create({
+      action: AuditAction.UPDATE,
+      entityType: 'Contract',
+      entityId: id,
+      userId: user.id,
+      oldValue: {
+        ownerId: oldOwnerId,
+        action: 'assignment',
+      },
+      newValue: {
+        ownerId: newOwnerId,
+        ownerName: `${newOwner.firstName} ${newOwner.lastName}`,
+        reason: reason || undefined,
+        action: 'assignment',
+      },
+      ipAddress: getClientIp(this.request),
+      userAgent: getUserAgent(this.request),
+      contractId: id,
+    });
+
+    this.logger.log(
+      `Contract ${id} assigned to ${newOwner.firstName} ${newOwner.lastName} by ${user.email}` +
+        (reason ? ` (Grund: ${reason})` : ''),
+    );
 
     return updated;
   }
@@ -291,10 +420,31 @@ export class ContractsService {
 
     // Only allow deletion of drafts
     if (contract.status !== ContractStatus.DRAFT) {
-      throw new ForbiddenException('Only draft contracts can be deleted');
+      throw new ForbiddenException('Nur Entwürfe können gelöscht werden');
     }
 
+    // Capture contract data for audit log before deletion
+    const oldValue = {
+      contractNumber: contract.contractNumber,
+      title: contract.title,
+      type: contract.type,
+      status: contract.status,
+      partnerId: contract.partnerId,
+      value: contract.value,
+    };
+
     await this.prisma.contract.delete({ where: { id } });
+
+    // Audit log for deletion
+    await this.auditLogService.create({
+      action: AuditAction.DELETE,
+      entityType: 'Contract',
+      entityId: id,
+      userId: user.id,
+      oldValue,
+      ipAddress: getClientIp(this.request),
+      userAgent: getUserAgent(this.request),
+    });
 
     this.logger.log(`Contract ${id} deleted by ${user.email}`);
   }
@@ -311,15 +461,15 @@ export class ContractsService {
     // Build base where clause based on user access
     let where: Prisma.ContractWhereInput = {};
     if (!user.roles.includes('ADMIN')) {
-      const dbUser = await this.getUserByKeycloakId(user.id);
       where = {
-        OR: [{ ownerId: dbUser.id }, { createdById: dbUser.id }],
+        OR: [{ ownerId: user.id }, { createdById: user.id }],
       };
     }
 
     const [
       total,
       byStatus,
+      byType,
       expiringIn30Days,
       expiringIn60Days,
       expiringIn90Days,
@@ -330,6 +480,11 @@ export class ContractsService {
         by: ['status'],
         where,
         _count: { status: true },
+      }),
+      this.prisma.contract.groupBy({
+        by: ['type'],
+        where,
+        _count: { type: true },
       }),
       this.prisma.contract.count({
         where: {
@@ -371,9 +526,25 @@ export class ContractsService {
       statusCounts[item.status] = item._count.status;
     });
 
+    const typeCounts: Record<ContractType, number> = {
+      [ContractType.SUPPLIER]: 0,
+      [ContractType.CUSTOMER]: 0,
+      [ContractType.EMPLOYMENT]: 0,
+      [ContractType.SERVICE]: 0,
+      [ContractType.LEASE]: 0,
+      [ContractType.LICENSE]: 0,
+      [ContractType.NDA]: 0,
+      [ContractType.OTHER]: 0,
+    };
+
+    byType.forEach((item) => {
+      typeCounts[item.type] = item._count.type;
+    });
+
     return {
       total,
       byStatus: statusCounts,
+      byType: typeCounts,
       expiringIn30Days,
       expiringIn60Days,
       expiringIn90Days,
@@ -394,10 +565,9 @@ export class ContractsService {
     };
 
     if (!user.roles.includes('ADMIN')) {
-      const dbUser = await this.getUserByKeycloakId(user.id);
       where = {
         ...where,
-        OR: [{ ownerId: dbUser.id }, { createdById: dbUser.id }],
+        OR: [{ ownerId: user.id }, { createdById: user.id }],
       };
     }
 
@@ -429,20 +599,5 @@ export class ContractsService {
     });
 
     return result;
-  }
-
-  /**
-   * Get user by Keycloak ID
-   */
-  private async getUserByKeycloakId(keycloakId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { keycloakId },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
   }
 }

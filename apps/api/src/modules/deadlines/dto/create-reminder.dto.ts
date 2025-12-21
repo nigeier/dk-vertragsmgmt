@@ -1,11 +1,4 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsEnum,
-  IsUUID,
-  IsDateString,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEnum, IsUUID, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ReminderType } from '@prisma/client';
 
@@ -16,7 +9,7 @@ export class CreateReminderDto {
     example: ReminderType.EXPIRATION,
   })
   @IsEnum(ReminderType)
-  type: ReminderType;
+  type!: ReminderType;
 
   @ApiProperty({
     description: 'Reminder date',
@@ -24,7 +17,7 @@ export class CreateReminderDto {
   })
   @IsDateString()
   @IsNotEmpty()
-  reminderDate: string;
+  reminderDate!: string;
 
   @ApiPropertyOptional({
     description: 'Custom message',
@@ -40,5 +33,5 @@ export class CreateReminderDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  contractId: string;
+  contractId!: string;
 }

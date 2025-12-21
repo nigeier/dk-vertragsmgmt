@@ -1,0 +1,24 @@
+<h2>Vertragsablauf-Erinnerung</h2>
+
+<p>Hallo {{userName}},</p>
+
+<p>wir möchten Sie darauf hinweisen, dass folgender Vertrag in Kürze ausläuft:</p>
+
+<div class="info-box">
+  <p><strong>Vertragsbezeichnung:</strong> {{contractTitle}}</p>
+  <p><strong>Vertragsnummer:</strong> {{contractNumber}}</p>
+  <p><strong>Ablaufdatum:</strong> {{expirationDate}}</p>
+  <p><strong>Verbleibende Tage:</strong> {{daysUntilExpiration}} Tage</p>
+</div>
+
+{{#if (lte daysUntilExpiration 7)}}
+<div class="warning-box">
+  <strong>Achtung:</strong> Der Vertrag läuft in weniger als einer Woche aus!
+</div>
+{{/if}}
+
+<p>Bitte prüfen Sie, ob der Vertrag verlängert, neu verhandelt oder gekündigt werden soll.</p>
+
+<a href="{{contractUrl}}" class="button">Vertrag anzeigen</a>
+
+<p>Mit freundlichen Grüßen,<br>Ihr Vertragsmanagement-Team</p>

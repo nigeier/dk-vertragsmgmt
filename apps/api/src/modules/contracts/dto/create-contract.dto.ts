@@ -25,7 +25,7 @@ export class CreateContractDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  title: string;
+  title!: string;
 
   @ApiPropertyOptional({
     description: 'Contract description',
@@ -41,7 +41,7 @@ export class CreateContractDto {
     example: ContractType.SUPPLIER,
   })
   @IsEnum(ContractType)
-  type: ContractType;
+  type!: ContractType;
 
   @ApiPropertyOptional({
     description: 'Contract status',
@@ -137,7 +137,7 @@ export class CreateContractDto {
   })
   @IsUUID()
   @IsNotEmpty()
-  partnerId: string;
+  partnerId!: string;
 
   @ApiPropertyOptional({
     description: 'Owner user ID (defaults to creator)',

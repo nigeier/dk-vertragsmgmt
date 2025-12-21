@@ -7,23 +7,22 @@ import {
   Body,
   UseGuards,
   ParseUUIDPipe,
+  Req,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Request } from 'express';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserFilterDto } from './dto/user-filter.dto';
-import { KeycloakAuthGuard } from '../../common/guards/keycloak-auth.guard';
+import { JwtAuthGuard, AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { SkipAudit } from '../../common/decorators/audit.decorator';
+import { getClientIp, getUserAgent } from '../../common/utils/request.utils';
 
-@ApiTags('users')
+@ApiTags('Users')
 @ApiBearerAuth('access-token')
-@UseGuards(KeycloakAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -34,6 +33,14 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Users list returned' })
   async findAll(@Query() filterDto: UserFilterDto) {
     return this.usersService.findAll(filterDto);
+  }
+
+  @Get('active/list')
+  @SkipAudit()
+  @ApiOperation({ summary: 'Get active users for dropdowns (lightweight)' })
+  @ApiResponse({ status: 200, description: 'Active users list returned' })
+  async findActiveForDropdown() {
+    return this.usersService.findActiveForDropdown();
   }
 
   @Get(':id')
@@ -47,6 +54,7 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @SkipAudit() // Audit wird im Service gehandhabt
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Update user' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
@@ -55,25 +63,49 @@ export class UsersController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
   ) {
-    return this.usersService.update(id, updateUserDto);
+    return this.usersService.update(id, updateUserDto, {
+      user,
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
   }
 
   @Patch(':id/deactivate')
+  @SkipAudit() // Audit wird im Service gehandhabt
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Deactivate user' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'User deactivated' })
-  async deactivate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.setActive(id, false);
+  async deactivate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    return this.usersService.setActive(id, false, {
+      user,
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
   }
 
   @Patch(':id/activate')
+  @SkipAudit() // Audit wird im Service gehandhabt
   @Roles('ADMIN')
   @ApiOperation({ summary: 'Activate user' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'User activated' })
-  async activate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.setActive(id, true);
+  async activate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request,
+  ) {
+    return this.usersService.setActive(id, true, {
+      user,
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
   }
 }

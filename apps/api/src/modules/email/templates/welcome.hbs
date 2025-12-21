@@ -1,0 +1,26 @@
+<h2>Willkommen bei Drykorn Vertragsmanagement</h2>
+
+<p>Hallo {{userName}},</p>
+
+<p>Ihr Benutzerkonto wurde erfolgreich erstellt. Sie können sich ab sofort im Vertragsmanagement-System anmelden.</p>
+
+{{#if temporaryPassword}}
+<div class="info-box">
+  <p><strong>Ihr temporäres Passwort:</strong></p>
+  <p style="font-family: monospace; font-size: 16px; background: #e9ecef; padding: 10px; border-radius: 4px;">{{temporaryPassword}}</p>
+  <p><em>Bitte ändern Sie Ihr Passwort nach der ersten Anmeldung.</em></p>
+</div>
+{{/if}}
+
+<a href="{{loginUrl}}" class="button">Jetzt anmelden</a>
+
+<h3>Erste Schritte</h3>
+<ul>
+  <li>Melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an</li>
+  <li>Ändern Sie Ihr Passwort unter "Einstellungen"</li>
+  <li>Aktivieren Sie die Zwei-Faktor-Authentifizierung für zusätzliche Sicherheit</li>
+</ul>
+
+<p>Bei Fragen wenden Sie sich bitte an Ihren Administrator.</p>
+
+<p>Mit freundlichen Grüßen,<br>Ihr Vertragsmanagement-Team</p>

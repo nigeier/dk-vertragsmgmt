@@ -1,14 +1,16 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserFilterDto } from './dto/user-filter.dto';
-import { User, Prisma } from '@prisma/client';
+import { User, Prisma, AuditAction, UserRole } from '@prisma/client';
+import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 
-interface UserWithStats extends User {
+export interface UserWithStats extends User {
   _count: { contracts: number; createdContracts: number };
 }
 
-interface PaginatedResult<T> {
+export interface PaginatedResult<T> {
   data: T[];
   meta: {
     total: number;
@@ -18,11 +20,20 @@ interface PaginatedResult<T> {
   };
 }
 
+export interface AuditContext {
+  user: AuthenticatedUser;
+  ipAddress: string;
+  userAgent?: string;
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   /**
    * Get all users with filtering and pagination
@@ -89,26 +100,56 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Benutzer nicht gefunden');
     }
 
     return user;
   }
 
   /**
-   * Get user by Keycloak ID
+   * Get user by email
    */
-  async findByKeycloakId(keycloakId: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<User | null> {
     return this.prisma.user.findUnique({
-      where: { keycloakId },
+      where: { email },
+    });
+  }
+
+  /**
+   * Get active users for dropdowns (lightweight)
+   */
+  async findActiveForDropdown(): Promise<
+    { id: string; firstName: string; lastName: string; email: string; role: string }[]
+  > {
+    return this.prisma.user.findMany({
+      where: {
+        isActive: true,
+        status: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+      },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
   }
 
   /**
    * Update user
    */
-  async update(id: string, dto: UpdateUserDto): Promise<User> {
-    await this.findOne(id);
+  async update(id: string, dto: UpdateUserDto, audit: AuditContext): Promise<User> {
+    const existing = await this.findOne(id);
+
+    // Capture old values for audit
+    const oldValue = {
+      firstName: existing.firstName,
+      lastName: existing.lastName,
+      department: existing.department,
+      role: existing.role,
+    };
 
     const user = await this.prisma.user.update({
       where: { id },
@@ -116,10 +157,23 @@ export class UsersService {
         firstName: dto.firstName,
         lastName: dto.lastName,
         department: dto.department,
+        role: dto.role as UserRole | undefined,
       },
     });
 
-    this.logger.log(`User ${id} updated`);
+    // Audit Log with old and new values
+    await this.auditLogService.create({
+      action: AuditAction.UPDATE,
+      entityType: 'User',
+      entityId: id,
+      userId: audit.user.id,
+      oldValue,
+      newValue: dto as unknown as Record<string, unknown>,
+      ipAddress: audit.ipAddress,
+      userAgent: audit.userAgent,
+    });
+
+    this.logger.log(`User ${id} updated by ${audit.user.email}`);
 
     return user;
   }
@@ -127,51 +181,43 @@ export class UsersService {
   /**
    * Set user active status
    */
-  async setActive(id: string, isActive: boolean): Promise<User> {
-    await this.findOne(id);
+  async setActive(id: string, isActive: boolean, audit: AuditContext): Promise<User> {
+    const targetUser = await this.findOne(id);
+
+    // Prevent self-deactivation
+    if (id === audit.user.id && !isActive) {
+      throw new ForbiddenException('Sie können sich nicht selbst deaktivieren');
+    }
+
+    // Prevent deactivating the last admin
+    if (!isActive && targetUser.role === 'ADMIN') {
+      const adminCount = await this.prisma.user.count({
+        where: { role: 'ADMIN', isActive: true },
+      });
+      if (adminCount <= 1) {
+        throw new ForbiddenException('Der letzte Administrator kann nicht deaktiviert werden');
+      }
+    }
 
     const user = await this.prisma.user.update({
       where: { id },
       data: { isActive },
     });
 
-    this.logger.log(`User ${id} ${isActive ? 'activated' : 'deactivated'}`);
+    // Audit Log
+    await this.auditLogService.create({
+      action: AuditAction.UPDATE,
+      entityType: 'User',
+      entityId: id,
+      userId: audit.user.id,
+      oldValue: { isActive: targetUser.isActive },
+      newValue: { isActive },
+      ipAddress: audit.ipAddress,
+      userAgent: audit.userAgent,
+    });
+
+    this.logger.log(`User ${id} ${isActive ? 'activated' : 'deactivated'} by ${audit.user.email}`);
 
     return user;
-  }
-
-  /**
-   * Sync user from Keycloak
-   */
-  async syncFromKeycloak(keycloakUser: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  }): Promise<User> {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { keycloakId: keycloakUser.id },
-    });
-
-    if (existingUser) {
-      return this.prisma.user.update({
-        where: { keycloakId: keycloakUser.id },
-        data: {
-          email: keycloakUser.email,
-          firstName: keycloakUser.firstName,
-          lastName: keycloakUser.lastName,
-        },
-      });
-    }
-
-    return this.prisma.user.create({
-      data: {
-        keycloakId: keycloakUser.id,
-        email: keycloakUser.email,
-        firstName: keycloakUser.firstName,
-        lastName: keycloakUser.lastName,
-        isActive: true,
-      },
-    });
   }
 }

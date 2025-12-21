@@ -66,14 +66,15 @@ export default function ContractsPage(): React.JSX.Element {
 
   const { data, isLoading } = useQuery<ContractsResponse>({
     queryKey: ['contracts', { page, search, status, type }],
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams();
       params.set('page', String(page));
       params.set('limit', '20');
       if (search) params.set('search', search);
       if (status) params.set('status', status);
       if (type) params.set('type', type);
-      return api.get(`/contracts?${params.toString()}`).then((res) => res.data);
+      const response = await api.get<ContractsResponse>(`/contracts?${params.toString()}`);
+      return response.data;
     },
   });
 
@@ -115,11 +116,7 @@ export default function ContractsPage(): React.JSX.Element {
       [ContractStatus.TERMINATED]: 'destructive',
       [ContractStatus.ARCHIVED]: 'secondary',
     };
-    return (
-      <Badge variant={variants[status]}>
-        {CONTRACT_STATUS_LABELS[status]}
-      </Badge>
-    );
+    return <Badge variant={variants[status]}>{CONTRACT_STATUS_LABELS[status]}</Badge>;
   };
 
   const formatCurrency = (value: number | null, currency: string): string => {
@@ -178,10 +175,7 @@ export default function ContractsPage(): React.JSX.Element {
               </SelectContent>
             </Select>
 
-            <Select
-              value={type || 'all'}
-              onValueChange={(value) => handleFilter('type', value)}
-            >
+            <Select value={type || 'all'} onValueChange={(value) => handleFilter('type', value)}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Vertragsart" />
               </SelectTrigger>
@@ -224,12 +218,10 @@ export default function ContractsPage(): React.JSX.Element {
                       className="cursor-pointer"
                       onClick={() => router.push(`/contracts/${contract.id}`)}
                     >
-                      <TableCell className="font-mono text-sm">
-                        {contract.contractNumber}
-                      </TableCell>
+                      <TableCell className="font-mono text-sm">{contract.contractNumber}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <FileText className="text-muted-foreground h-4 w-4" />
                           {contract.title}
                         </div>
                       </TableCell>
@@ -252,10 +244,9 @@ export default function ContractsPage(): React.JSX.Element {
               {/* Pagination */}
               {data.meta.totalPages > 1 && (
                 <div className="mt-4 flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    Zeige {(page - 1) * 20 + 1} bis{' '}
-                    {Math.min(page * 20, data.meta.total)} von {data.meta.total}{' '}
-                    Verträgen
+                  <p className="text-muted-foreground text-sm">
+                    Zeige {(page - 1) * 20 + 1} bis {Math.min(page * 20, data.meta.total)} von{' '}
+                    {data.meta.total} Verträgen
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -280,9 +271,9 @@ export default function ContractsPage(): React.JSX.Element {
             </>
           ) : (
             <div className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground" />
+              <FileText className="text-muted-foreground h-12 w-12" />
               <h3 className="mt-4 text-lg font-medium">Keine Verträge gefunden</h3>
-              <p className="mt-1 text-muted-foreground">
+              <p className="text-muted-foreground mt-1">
                 Erstellen Sie einen neuen Vertrag oder ändern Sie Ihre Filterkriterien.
               </p>
               <Link href="/contracts/new" className="mt-4">

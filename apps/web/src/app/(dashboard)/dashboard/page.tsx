@@ -4,26 +4,35 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  FileText,
-  AlertTriangle,
-  Clock,
-  TrendingUp,
-  Users,
-  Calendar
-} from 'lucide-react';
+import { FileText, AlertTriangle, Clock, TrendingUp, Users, Calendar } from 'lucide-react';
 import { CONTRACT_STATUS_LABELS, type ContractStats } from '@drykorn/shared';
 import Link from 'next/link';
+
+interface ExpiringContract {
+  id: string;
+  title: string;
+  contractNumber: string;
+  endDate: string;
+  partner: {
+    name: string;
+  };
+}
 
 export default function DashboardPage(): React.JSX.Element {
   const { data: stats, isLoading } = useQuery<ContractStats>({
     queryKey: ['contract-stats'],
-    queryFn: () => api.get('/contracts/stats').then((res) => res.data),
+    queryFn: async () => {
+      const response = await api.get<ContractStats>('/contracts/stats');
+      return response.data;
+    },
   });
 
-  const { data: expiring } = useQuery({
+  const { data: expiring } = useQuery<ExpiringContract[]>({
     queryKey: ['expiring-contracts'],
-    queryFn: () => api.get('/contracts/expiring?days=30').then((res) => res.data),
+    queryFn: async () => {
+      const response = await api.get<ExpiringContract[]>('/contracts/expiring?days=30');
+      return response.data;
+    },
   });
 
   if (isLoading) {
@@ -73,13 +82,11 @@ export default function DashboardPage(): React.JSX.Element {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Verträge gesamt</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.total ?? 0}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats?.byStatus?.ACTIVE ?? 0} aktiv
-            </p>
+            <p className="text-muted-foreground text-xs">{stats?.byStatus?.ACTIVE ?? 0} aktiv</p>
           </CardContent>
         </Card>
 
@@ -89,34 +96,30 @@ export default function DashboardPage(): React.JSX.Element {
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-500">
-              {stats?.expiringIn30Days ?? 0}
-            </div>
-            <p className="text-xs text-muted-foreground">In den nächsten 30 Tagen</p>
+            <div className="text-2xl font-bold text-amber-500">{stats?.expiringIn30Days ?? 0}</div>
+            <p className="text-muted-foreground text-xs">In den nächsten 30 Tagen</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Gesamtwert</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(stats?.totalValue ?? 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">Aktive Verträge</p>
+            <div className="text-2xl font-bold">{formatCurrency(stats?.totalValue ?? 0)}</div>
+            <p className="text-muted-foreground text-xs">Aktive Verträge</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Entwürfe</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.byStatus?.DRAFT ?? 0}</div>
-            <p className="text-xs text-muted-foreground">Zur Bearbeitung</p>
+            <p className="text-muted-foreground text-xs">Zur Bearbeitung</p>
           </CardContent>
         </Card>
       </div>
@@ -138,10 +141,10 @@ export default function DashboardPage(): React.JSX.Element {
                           status === 'ACTIVE'
                             ? 'bg-green-500'
                             : status === 'DRAFT'
-                            ? 'bg-gray-500'
-                            : status === 'EXPIRED'
-                            ? 'bg-red-500'
-                            : 'bg-yellow-500'
+                              ? 'bg-gray-500'
+                              : status === 'EXPIRED'
+                                ? 'bg-red-500'
+                                : 'bg-yellow-500'
                         }`}
                       />
                       <span className="text-sm">
@@ -160,7 +163,7 @@ export default function DashboardPage(): React.JSX.Element {
             <CardTitle>Bald ablaufende Verträge</CardTitle>
             <Link
               href="/contracts?status=ACTIVE&expiring=30"
-              className="text-sm text-primary hover:underline"
+              className="text-primary text-sm hover:underline"
             >
               Alle anzeigen
             </Link>
@@ -168,34 +171,36 @@ export default function DashboardPage(): React.JSX.Element {
           <CardContent>
             {expiring && expiring.length > 0 ? (
               <div className="space-y-4">
-                {expiring.slice(0, 5).map((contract: {
-                  id: string;
-                  title: string;
-                  endDate: string;
-                  partner: { name: string };
-                }) => (
-                  <Link
-                    key={contract.id}
-                    href={`/contracts/${contract.id}`}
-                    className="flex items-center justify-between rounded-lg p-2 hover:bg-muted"
-                  >
-                    <div>
-                      <p className="font-medium">{contract.title}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {contract.partner.name}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-amber-500">
-                        <Calendar className="mr-1 inline h-3 w-3" />
-                        {new Date(contract.endDate).toLocaleDateString('de-DE')}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                {expiring
+                  .slice(0, 5)
+                  .map(
+                    (contract: {
+                      id: string;
+                      title: string;
+                      endDate: string;
+                      partner: { name: string };
+                    }) => (
+                      <Link
+                        key={contract.id}
+                        href={`/contracts/${contract.id}`}
+                        className="hover:bg-muted flex items-center justify-between rounded-lg p-2"
+                      >
+                        <div>
+                          <p className="font-medium">{contract.title}</p>
+                          <p className="text-muted-foreground text-sm">{contract.partner.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-amber-500">
+                            <Calendar className="mr-1 inline h-3 w-3" />
+                            {new Date(contract.endDate).toLocaleDateString('de-DE')}
+                          </p>
+                        </div>
+                      </Link>
+                    ),
+                  )}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground">
+              <p className="text-muted-foreground text-center">
                 Keine Verträge laufen in den nächsten 30 Tagen ab.
               </p>
             )}
@@ -212,32 +217,32 @@ export default function DashboardPage(): React.JSX.Element {
           <div className="grid gap-4 md:grid-cols-3">
             <Link
               href="/contracts/new"
-              className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-muted"
+              className="hover:bg-muted flex items-center gap-3 rounded-lg border p-4 transition-colors"
             >
-              <FileText className="h-8 w-8 text-primary" />
+              <FileText className="text-primary h-8 w-8" />
               <div>
                 <p className="font-medium">Neuer Vertrag</p>
-                <p className="text-sm text-muted-foreground">Vertrag erstellen</p>
+                <p className="text-muted-foreground text-sm">Vertrag erstellen</p>
               </div>
             </Link>
             <Link
               href="/partners"
-              className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-muted"
+              className="hover:bg-muted flex items-center gap-3 rounded-lg border p-4 transition-colors"
             >
-              <Users className="h-8 w-8 text-primary" />
+              <Users className="text-primary h-8 w-8" />
               <div>
                 <p className="font-medium">Partner</p>
-                <p className="text-sm text-muted-foreground">Verwalten</p>
+                <p className="text-muted-foreground text-sm">Verwalten</p>
               </div>
             </Link>
             <Link
               href="/deadlines"
-              className="flex items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-muted"
+              className="hover:bg-muted flex items-center gap-3 rounded-lg border p-4 transition-colors"
             >
-              <Clock className="h-8 w-8 text-primary" />
+              <Clock className="text-primary h-8 w-8" />
               <div>
                 <p className="font-medium">Fristen</p>
-                <p className="text-sm text-muted-foreground">Übersicht</p>
+                <p className="text-muted-foreground text-sm">Übersicht</p>
               </div>
             </Link>
           </div>

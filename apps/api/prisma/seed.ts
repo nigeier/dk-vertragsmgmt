@@ -1,25 +1,87 @@
-import { PrismaClient, ContractType, ContractStatus, ReminderType } from '@prisma/client';
+import {
+  PrismaClient,
+  ContractType,
+  ContractStatus,
+  ReminderType,
+  UserRole,
+  UserStatus,
+} from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
-  console.log('Seeding database...');
+  console.log('Datenbank wird befüllt...');
 
-  // Create demo user
-  const user = await prisma.user.upsert({
+  // Passwort hashen (Standard: Admin123!)
+  const adminPassword = await bcrypt.hash('Admin123!', 12);
+  const userPassword = await bcrypt.hash('User123!', 12);
+
+  // Admin-Benutzer erstellen
+  const admin = await prisma.user.upsert({
     where: { email: 'admin@drykorn.de' },
-    update: {},
+    update: {
+      passwordHash: adminPassword,
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
+    },
     create: {
-      keycloakId: 'dev-admin-user',
       email: 'admin@drykorn.de',
+      passwordHash: adminPassword,
       firstName: 'Admin',
       lastName: 'User',
+      role: UserRole.ADMIN,
+      status: UserStatus.ACTIVE,
       department: 'IT',
       isActive: true,
     },
   });
 
-  console.log('Created user:', user.email);
+  console.log('Admin erstellt:', admin.email, '(Passwort: Admin123!)');
+
+  // Manager-Benutzer erstellen
+  const manager = await prisma.user.upsert({
+    where: { email: 'manager@drykorn.de' },
+    update: {
+      passwordHash: userPassword,
+      role: UserRole.MANAGER,
+      status: UserStatus.ACTIVE,
+    },
+    create: {
+      email: 'manager@drykorn.de',
+      passwordHash: userPassword,
+      firstName: 'Max',
+      lastName: 'Manager',
+      role: UserRole.MANAGER,
+      status: UserStatus.ACTIVE,
+      department: 'Einkauf',
+      isActive: true,
+    },
+  });
+
+  console.log('Manager erstellt:', manager.email, '(Passwort: User123!)');
+
+  // Standard-Benutzer erstellen
+  const user = await prisma.user.upsert({
+    where: { email: 'user@drykorn.de' },
+    update: {
+      passwordHash: userPassword,
+      role: UserRole.USER,
+      status: UserStatus.ACTIVE,
+    },
+    create: {
+      email: 'user@drykorn.de',
+      passwordHash: userPassword,
+      firstName: 'Test',
+      lastName: 'Benutzer',
+      role: UserRole.USER,
+      status: UserStatus.ACTIVE,
+      department: 'Vertrieb',
+      isActive: true,
+    },
+  });
+
+  console.log('Benutzer erstellt:', user.email, '(Passwort: User123!)');
 
   // Create demo partners
   const partners = await Promise.all([
@@ -109,8 +171,8 @@ async function main(): Promise<void> {
         paymentTerms: '30 Tage netto',
         tags: ['premium', 'stoffe', 'rahmenvertrag'],
         partnerId: partners[0].id,
-        ownerId: user.id,
-        createdById: user.id,
+        ownerId: admin.id,
+        createdById: admin.id,
       },
     }),
     prisma.contract.upsert({
@@ -131,8 +193,8 @@ async function main(): Promise<void> {
         paymentTerms: '14 Tage netto',
         tags: ['vertrieb', 'exklusiv', 'dach'],
         partnerId: partners[1].id,
-        ownerId: user.id,
-        createdById: user.id,
+        ownerId: manager.id,
+        createdById: admin.id,
       },
     }),
     prisma.contract.upsert({
@@ -153,8 +215,8 @@ async function main(): Promise<void> {
         paymentTerms: '30 Tage netto',
         tags: ['logistik', 'lager', 'versand'],
         partnerId: partners[2].id,
-        ownerId: user.id,
-        createdById: user.id,
+        ownerId: admin.id,
+        createdById: manager.id,
       },
     }),
     prisma.contract.upsert({
@@ -205,27 +267,37 @@ async function main(): Promise<void> {
 
   console.log('Created reminders:', reminders.length);
 
-  // Create sample notifications
+  // Benachrichtigungen erstellen
   await prisma.notification.createMany({
     data: [
       {
         title: 'Vertrag läuft bald ab',
         message: 'Der Rahmenvertrag Stofflieferung 2024 läuft in 30 Tagen ab.',
         link: `/contracts/${contracts[0].id}`,
-        userId: user.id,
+        userId: admin.id,
       },
       {
         title: 'Neuer Vertrag erstellt',
         message: 'Der NDA Premium Textiles wurde als Entwurf gespeichert.',
         link: `/contracts/${contracts[3].id}`,
-        userId: user.id,
+        userId: admin.id,
         isRead: true,
         readAt: new Date(),
+      },
+      {
+        title: 'Willkommen!',
+        message: 'Willkommen im Drykorn Vertragsmanagement System.',
+        userId: manager.id,
       },
     ],
   });
 
-  console.log('Seeding completed!');
+  console.log('Datenbank erfolgreich befüllt!');
+  console.log('');
+  console.log('=== Login-Daten ===');
+  console.log('Admin:   admin@drykorn.de / Admin123!');
+  console.log('Manager: manager@drykorn.de / User123!');
+  console.log('User:    user@drykorn.de / User123!');
 }
 
 main()
@@ -233,6 +305,6 @@ main()
     console.error('Seeding failed:', e);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
+  .finally(() => {
+    void prisma.$disconnect();
   });

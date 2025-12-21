@@ -1,15 +1,13 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { CreateReminderDto } from './dto/create-reminder.dto';
-import { AuthenticatedUser } from '../../common/guards/keycloak-auth.guard';
+import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
+import { ConfigService } from '@nestjs/config';
 import { Reminder, ContractStatus, Prisma } from '@prisma/client';
 
-interface UpcomingDeadline {
+export interface UpcomingDeadline {
   id: string;
   type: string;
   reminderDate: Date;
@@ -24,8 +22,103 @@ interface UpcomingDeadline {
 @Injectable()
 export class DeadlinesService {
   private readonly logger = new Logger(DeadlinesService.name);
+  private readonly frontendUrl: string;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+    private readonly configService: ConfigService,
+  ) {
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
+  }
+
+  /**
+   * Scheduled job: Send reminder emails every day at 8:00 AM
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  async sendScheduledReminders(): Promise<void> {
+    this.logger.log('Running scheduled reminder job...');
+
+    try {
+      const now = new Date();
+
+      // Find all unsent reminders that are due today or overdue
+      const dueReminders = await this.prisma.reminder.findMany({
+        where: {
+          reminderDate: { lte: now },
+          isSent: false,
+          contract: {
+            status: ContractStatus.ACTIVE,
+          },
+        },
+        include: {
+          contract: {
+            select: {
+              id: true,
+              contractNumber: true,
+              title: true,
+              endDate: true,
+              owner: {
+                select: {
+                  id: true,
+                  email: true,
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+              partner: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      });
+
+      this.logger.log(`Found ${dueReminders.length} due reminders`);
+
+      for (const reminder of dueReminders) {
+        const owner = reminder.contract.owner;
+        if (!owner?.email) {
+          this.logger.warn(`No owner email for contract ${reminder.contract.id}`);
+          continue;
+        }
+
+        try {
+          // Calculate days until expiration
+          const daysUntilExpiration = reminder.contract.endDate
+            ? Math.ceil(
+                (reminder.contract.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+              )
+            : 0;
+
+          // Send email
+          await this.emailService.sendContractExpirationReminder({
+            to: owner.email,
+            userName: `${owner.firstName} ${owner.lastName}`,
+            contractTitle: reminder.contract.title,
+            contractNumber: reminder.contract.contractNumber,
+            expirationDate: reminder.contract.endDate || new Date(),
+            daysUntilExpiration,
+            contractUrl: `${this.frontendUrl}/contracts/${reminder.contract.id}`,
+          });
+
+          // Mark reminder as sent
+          await this.prisma.reminder.update({
+            where: { id: reminder.id },
+            data: { isSent: true },
+          });
+
+          this.logger.log(`Reminder email sent for contract ${reminder.contract.contractNumber}`);
+        } catch (error) {
+          this.logger.error(`Failed to send reminder for ${reminder.id}: ${String(error)}`);
+        }
+      }
+
+      this.logger.log('Scheduled reminder job completed');
+    } catch (error) {
+      this.logger.error('Scheduled reminder job failed', error);
+    }
+  }
 
   /**
    * Get upcoming deadlines (reminders and contract expirations)
@@ -40,10 +133,9 @@ export class DeadlinesService {
 
     // Non-admin users can only see their own contracts
     if (!user.roles.includes('ADMIN')) {
-      const dbUser = await this.getDbUser(user.id);
       contractFilter = {
         ...contractFilter,
-        OR: [{ ownerId: dbUser.id }, { createdById: dbUser.id }],
+        OR: [{ ownerId: user.id }, { createdById: user.id }],
       };
     }
 
@@ -125,7 +217,7 @@ export class DeadlinesService {
     });
 
     if (!reminder) {
-      throw new NotFoundException('Reminder not found');
+      throw new NotFoundException('Erinnerung nicht gefunden');
     }
 
     await this.verifyContractAccess(reminder.contractId, user);
@@ -166,43 +258,22 @@ export class DeadlinesService {
   /**
    * Verify user has access to the contract
    */
-  private async verifyContractAccess(
-    contractId: string,
-    user: AuthenticatedUser,
-  ): Promise<void> {
+  private async verifyContractAccess(contractId: string, user: AuthenticatedUser): Promise<void> {
     const contract = await this.prisma.contract.findUnique({
       where: { id: contractId },
       select: { ownerId: true, createdById: true },
     });
 
     if (!contract) {
-      throw new NotFoundException('Contract not found');
+      throw new NotFoundException('Vertrag nicht gefunden');
     }
 
     if (user.roles.includes('ADMIN')) {
       return;
     }
 
-    const dbUser = await this.getDbUser(user.id);
-
-    if (contract.ownerId !== dbUser.id && contract.createdById !== dbUser.id) {
-      throw new ForbiddenException('Access denied');
+    if (contract.ownerId !== user.id && contract.createdById !== user.id) {
+      throw new ForbiddenException('Zugriff verweigert');
     }
-  }
-
-  /**
-   * Get database user by Keycloak ID
-   */
-  private async getDbUser(keycloakId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { keycloakId },
-      select: { id: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
   }
 }

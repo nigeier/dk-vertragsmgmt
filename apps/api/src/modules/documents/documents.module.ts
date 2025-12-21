@@ -3,7 +3,8 @@ import { MulterModule } from '@nestjs/platform-express';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
-import { MinioService } from './minio.service';
+import { FileStorageService } from './file-storage.service';
+import { DocumentCleanupService } from './cleanup.service';
 import { AuthModule } from '../auth/auth.module';
 import { memoryStorage } from 'multer';
 
@@ -36,14 +37,14 @@ import { memoryStorage } from 'multer';
           if (allowedMimes.includes(file.mimetype)) {
             callback(null, true);
           } else {
-            callback(new Error('Invalid file type'), false);
+            callback(new Error('Ungültiger Dateityp'), false);
           }
         },
       }),
     }),
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService, MinioService],
-  exports: [DocumentsService, MinioService],
+  providers: [DocumentsService, FileStorageService, DocumentCleanupService],
+  exports: [DocumentsService, FileStorageService, DocumentCleanupService],
 })
 export class DocumentsModule {}

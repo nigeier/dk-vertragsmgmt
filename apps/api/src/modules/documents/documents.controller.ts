@@ -26,13 +26,13 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { DocumentsService } from './documents.service';
-import { KeycloakAuthGuard, AuthenticatedUser } from '../../common/guards/keycloak-auth.guard';
+import { JwtAuthGuard, AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuditCreate, AuditDelete, AuditDownload } from '../../common/decorators/audit.decorator';
 
-@ApiTags('documents')
+@ApiTags('Documents')
 @ApiBearerAuth('access-token')
-@UseGuards(KeycloakAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
@@ -53,10 +53,7 @@ export class DocumentsController {
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Document metadata returned' })
   @ApiResponse({ status: 404, description: 'Document not found' })
-  async findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.documentsService.findOne(id, user);
   }
 
@@ -119,25 +116,50 @@ export class DocumentsController {
       throw new BadRequestException('No file uploaded');
     }
 
-    return this.documentsService.upload(
-      file,
-      contractId,
-      isMainDocument === 'true',
-      user,
-    );
+    return this.documentsService.upload(file, contractId, isMainDocument === 'true', user);
   }
 
   @Delete(':id')
   @AuditDelete('Document')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a document' })
+  @ApiOperation({ summary: 'Soft delete a document' })
   @ApiParam({ name: 'id', type: String, format: 'uuid' })
-  @ApiResponse({ status: 204, description: 'Document deleted' })
+  @ApiResponse({ status: 204, description: 'Document soft deleted' })
   @ApiResponse({ status: 404, description: 'Document not found' })
-  async remove(
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
+    await this.documentsService.remove(id, user);
+  }
+
+  @Post(':id/restore')
+  @AuditCreate('Document')
+  @ApiOperation({ summary: 'Restore a soft-deleted document' })
+  @ApiParam({ name: 'id', type: String, format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Document restored' })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  async restore(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.documentsService.restore(id, user);
+  }
+
+  @Get('admin/deleted')
+  @ApiOperation({ summary: 'Get all soft-deleted documents (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Deleted documents list returned' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  async findDeleted(@CurrentUser() user: AuthenticatedUser) {
+    return this.documentsService.findDeleted(user);
+  }
+
+  @Delete(':id/permanent')
+  @AuditDelete('Document')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Permanently delete a document (Admin only)' })
+  @ApiParam({ name: 'id', type: String, format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Document permanently deleted' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  async permanentDelete(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.documentsService.remove(id, user);
+    await this.documentsService.permanentDelete(id, user);
   }
 }

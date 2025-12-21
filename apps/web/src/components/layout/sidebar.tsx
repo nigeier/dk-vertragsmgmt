@@ -11,6 +11,7 @@ import {
   BarChart3,
   Settings,
   LogOut,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
@@ -26,15 +27,16 @@ const navigation = [
 
 export function Sidebar(): React.JSX.Element {
   const pathname = usePathname();
-  const { logout, user } = useAuth();
+  const { logout, user, hasRole } = useAuth();
+  const isAdmin = hasRole('ADMIN');
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r bg-card">
+    <div className="bg-card flex h-screen w-64 flex-col border-r">
       {/* Logo */}
       <div className="flex h-16 items-center border-b px-6">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <span className="text-lg font-bold text-primary-foreground">D</span>
+          <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-lg">
+            <span className="text-primary-foreground text-lg font-bold">D</span>
           </div>
           <span className="text-lg font-semibold">Drykorn</span>
         </Link>
@@ -60,19 +62,37 @@ export function Sidebar(): React.JSX.Element {
             </Link>
           );
         })}
+
+        {/* Admin Link */}
+        {isAdmin && (
+          <div className="mt-4 border-t pt-4">
+            <Link
+              href="/admin"
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                pathname.startsWith('/admin')
+                  ? 'bg-red-600 text-white'
+                  : 'text-red-600 hover:bg-red-50',
+              )}
+            >
+              <ShieldCheck className="h-5 w-5" />
+              Administration
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* User section */}
       <div className="border-t p-4">
-        <div className="mb-3 rounded-lg bg-muted p-3">
+        <div className="bg-muted mb-3 rounded-lg p-3">
           <p className="text-sm font-medium">
             {user?.firstName} {user?.lastName}
           </p>
-          <p className="text-xs text-muted-foreground">{user?.email}</p>
+          <p className="text-muted-foreground text-xs">{user?.email}</p>
         </div>
         <Button
           variant="ghost"
-          className="w-full justify-start text-muted-foreground"
+          className="text-muted-foreground w-full justify-start"
           onClick={() => logout()}
         >
           <LogOut className="mr-2 h-4 w-4" />

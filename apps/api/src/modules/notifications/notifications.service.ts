@@ -1,21 +1,33 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuthenticatedUser } from '../../common/guards/keycloak-auth.guard';
+import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
+import { EmailService } from '../email/email.service';
 import { Notification } from '@prisma/client';
+
+export interface NotificationWithEmail {
+  userId: string;
+  title: string;
+  message: string;
+  link?: string;
+  sendEmail?: boolean;
+}
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   /**
    * Get user notifications
    */
   async findAll(user: AuthenticatedUser, unreadOnly = false): Promise<Notification[]> {
-    const dbUser = await this.getDbUser(user.id);
-
     return this.prisma.notification.findMany({
       where: {
-        userId: dbUser.id,
+        userId: user.id,
         ...(unreadOnly ? { isRead: false } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -27,11 +39,9 @@ export class NotificationsService {
    * Get unread notification count
    */
   async getUnreadCount(user: AuthenticatedUser): Promise<{ count: number }> {
-    const dbUser = await this.getDbUser(user.id);
-
     const count = await this.prisma.notification.count({
       where: {
-        userId: dbUser.id,
+        userId: user.id,
         isRead: false,
       },
     });
@@ -58,11 +68,9 @@ export class NotificationsService {
    * Mark all notifications as read
    */
   async markAllAsRead(user: AuthenticatedUser): Promise<{ count: number }> {
-    const dbUser = await this.getDbUser(user.id);
-
     const result = await this.prisma.notification.updateMany({
       where: {
-        userId: dbUser.id,
+        userId: user.id,
         isRead: false,
       },
       data: {
@@ -88,13 +96,8 @@ export class NotificationsService {
   /**
    * Create a notification for a user
    */
-  async create(data: {
-    userId: string;
-    title: string;
-    message: string;
-    link?: string;
-  }): Promise<Notification> {
-    return this.prisma.notification.create({
+  async create(data: NotificationWithEmail): Promise<Notification> {
+    const notification = await this.prisma.notification.create({
       data: {
         title: data.title,
         message: data.message,
@@ -102,6 +105,43 @@ export class NotificationsService {
         userId: data.userId,
       },
     });
+
+    // Optionally send email notification
+    if (data.sendEmail) {
+      await this.sendEmailForNotification(data);
+    }
+
+    return notification;
+  }
+
+  /**
+   * Send email for a notification
+   */
+  private async sendEmailForNotification(data: NotificationWithEmail): Promise<void> {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { email: true, firstName: true, lastName: true },
+      });
+
+      if (!user) {
+        this.logger.warn(`User ${data.userId} not found for email notification`);
+        return;
+      }
+
+      // Send generic email
+      const html = `
+        <h2>${data.title}</h2>
+        <p>${data.message}</p>
+        ${data.link ? `<p><a href="${data.link}">Zum Vertrag</a></p>` : ''}
+      `;
+
+      await this.emailService.sendGenericEmail(user.email, data.title, html);
+      this.logger.log(`Email notification sent to ${user.email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send email notification: ${String(error)}`);
+      // Don't throw - email failure shouldn't break notification creation
+    }
   }
 
   /**
@@ -128,40 +168,19 @@ export class NotificationsService {
   /**
    * Get notification and verify ownership
    */
-  private async getNotification(
-    id: string,
-    user: AuthenticatedUser,
-  ): Promise<Notification> {
-    const dbUser = await this.getDbUser(user.id);
-
+  private async getNotification(id: string, user: AuthenticatedUser): Promise<Notification> {
     const notification = await this.prisma.notification.findUnique({
       where: { id },
     });
 
     if (!notification) {
-      throw new NotFoundException('Notification not found');
+      throw new NotFoundException('Benachrichtigung nicht gefunden');
     }
 
-    if (notification.userId !== dbUser.id) {
-      throw new ForbiddenException('Access denied');
+    if (notification.userId !== user.id) {
+      throw new ForbiddenException('Zugriff verweigert');
     }
 
     return notification;
-  }
-
-  /**
-   * Get database user by Keycloak ID
-   */
-  private async getDbUser(keycloakId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { keycloakId },
-      select: { id: true },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return user;
   }
 }

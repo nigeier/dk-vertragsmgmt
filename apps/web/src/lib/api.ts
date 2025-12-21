@@ -8,14 +8,9 @@ interface ApiError {
 
 class ApiClient {
   private baseUrl: string;
-  private accessToken: string | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
-  }
-
-  setAccessToken(token: string | null): void {
-    this.accessToken = token;
   }
 
   private async request<T>(
@@ -31,15 +26,12 @@ class ApiClient {
       ...options?.headers,
     };
 
-    if (this.accessToken) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
+    // Keine manuelle Token-Verwaltung mehr - httpOnly Cookies werden automatisch gesendet
     const response = await fetch(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
-      credentials: 'include',
+      credentials: 'include', // Wichtig: Cookies werden mitgesendet
       ...options,
     });
 
@@ -50,9 +42,7 @@ class ApiClient {
         error: response.statusText,
       }));
 
-      throw new Error(
-        Array.isArray(error.message) ? error.message.join(', ') : error.message,
-      );
+      throw new Error(Array.isArray(error.message) ? error.message.join(', ') : error.message);
     }
 
     // Handle 204 No Content
@@ -68,20 +58,50 @@ class ApiClient {
     return this.request<T>('GET', endpoint, undefined, options);
   }
 
-  async post<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<{ data: T; status: number }> {
+  async post<T>(
+    endpoint: string,
+    body?: unknown,
+    options?: RequestInit,
+  ): Promise<{ data: T; status: number }> {
     return this.request<T>('POST', endpoint, body, options);
   }
 
-  async put<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<{ data: T; status: number }> {
+  async put<T>(
+    endpoint: string,
+    body?: unknown,
+    options?: RequestInit,
+  ): Promise<{ data: T; status: number }> {
     return this.request<T>('PUT', endpoint, body, options);
   }
 
-  async patch<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<{ data: T; status: number }> {
+  async patch<T>(
+    endpoint: string,
+    body?: unknown,
+    options?: RequestInit,
+  ): Promise<{ data: T; status: number }> {
     return this.request<T>('PATCH', endpoint, body, options);
   }
 
   async delete<T>(endpoint: string, options?: RequestInit): Promise<{ data: T; status: number }> {
     return this.request<T>('DELETE', endpoint, undefined, options);
+  }
+
+  async downloadBlob(endpoint: string): Promise<Blob> {
+    const url = `${this.baseUrl}${endpoint}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        message: 'Download failed',
+      }));
+      throw new Error(error.message);
+    }
+
+    return response.blob();
   }
 
   async uploadFile<T>(
@@ -99,16 +119,11 @@ class ApiClient {
       });
     }
 
-    const headers: HeadersInit = {};
-    if (this.accessToken) {
-      headers['Authorization'] = `Bearer ${this.accessToken}`;
-    }
-
+    // Keine manuelle Token-Verwaltung - httpOnly Cookies werden automatisch gesendet
     const response = await fetch(url, {
       method: 'POST',
-      headers,
       body: formData,
-      credentials: 'include',
+      credentials: 'include', // Wichtig: Cookies werden mitgesendet
     });
 
     if (!response.ok) {

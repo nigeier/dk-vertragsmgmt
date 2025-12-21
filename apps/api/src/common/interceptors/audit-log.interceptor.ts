@@ -1,16 +1,11 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
 import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AuthenticatedUser } from '../guards/keycloak-auth.guard';
+import { AuthenticatedUser } from '../guards/jwt-auth.guard';
 import { AuditAction } from '@prisma/client';
+import { getClientIp, getUserAgent } from '../utils/request.utils';
 
 export const AUDIT_LOG_KEY = 'auditLog';
 export const SKIP_AUDIT_KEY = 'skipAudit';
@@ -38,10 +33,7 @@ export class AuditLogInterceptor implements NestInterceptor {
       return next.handle();
     }
 
-    const auditMetadata = this.reflector.get<AuditLogMetadata>(
-      AUDIT_LOG_KEY,
-      context.getHandler(),
-    );
+    const auditMetadata = this.reflector.get<AuditLogMetadata>(AUDIT_LOG_KEY, context.getHandler());
 
     if (!auditMetadata) {
       return next.handle();
@@ -57,12 +49,12 @@ export class AuditLogInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: async (response: unknown) => {
-          try {
-            await this.createAuditLog(request, response, user, auditMetadata);
-          } catch (error) {
-            this.logger.error('Failed to create audit log', error);
-          }
+        next: (response: unknown) => {
+          void this.createAuditLog(request, response, user, auditMetadata).catch(
+            (error: unknown) => {
+              this.logger.error('Failed to create audit log', error);
+            },
+          );
         },
       }),
     );
@@ -76,48 +68,32 @@ export class AuditLogInterceptor implements NestInterceptor {
   ): Promise<void> {
     const entityId = metadata.getEntityId
       ? metadata.getEntityId(request, response)
-      : (request.params.id as string);
+      : (request.params.id ?? '');
 
     if (!entityId) {
       return;
     }
 
-    // Get user from database by keycloak ID
-    const dbUser = await this.prisma.user.findUnique({
-      where: { keycloakId: user.id },
-      select: { id: true },
-    });
-
-    if (!dbUser) {
-      this.logger.warn(`User not found in database: ${user.id}`);
-      return;
-    }
-
-    const oldValue = metadata.getOldValue ? metadata.getOldValue(request) : undefined;
-    const newValue = metadata.getNewValue ? metadata.getNewValue(request, response) : undefined;
+    const oldValue: Record<string, unknown> | undefined = metadata.getOldValue
+      ? metadata.getOldValue(request)
+      : undefined;
+    const newValue: Record<string, unknown> | undefined = metadata.getNewValue
+      ? metadata.getNewValue(request, response)
+      : undefined;
 
     await this.prisma.auditLog.create({
       data: {
         action: metadata.action,
         entityType: metadata.entityType,
         entityId,
-        oldValue: oldValue ?? undefined,
-        newValue: newValue ?? undefined,
-        ipAddress: this.getClientIp(request),
-        userAgent: request.headers['user-agent'] || undefined,
-        userId: dbUser.id,
+        oldValue: oldValue ? structuredClone(oldValue) : undefined,
+        newValue: newValue ? structuredClone(newValue) : undefined,
+        ipAddress: getClientIp(request),
+        userAgent: getUserAgent(request),
+        userId: user.id,
         contractId: metadata.entityType === 'Contract' ? entityId : undefined,
         documentId: metadata.entityType === 'Document' ? entityId : undefined,
       },
     });
-  }
-
-  private getClientIp(request: Request): string {
-    const forwardedFor = request.headers['x-forwarded-for'];
-    if (forwardedFor) {
-      const ips = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-      return ips.split(',')[0].trim();
-    }
-    return request.ip || 'unknown';
   }
 }

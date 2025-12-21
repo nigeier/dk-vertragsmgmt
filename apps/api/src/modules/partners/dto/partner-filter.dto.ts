@@ -26,7 +26,9 @@ export class PartnerFilterDto {
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @Transform(({ value }: { value: unknown }) =>
+    Array.isArray(value) ? (value as string[]) : [value as string],
+  )
   type?: string[];
 
   @ApiPropertyOptional({
