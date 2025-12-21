@@ -11,11 +11,7 @@ export const metadata: Metadata = {
   robots: 'noindex, nofollow', // Internal system
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): React.JSX.Element {
+export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <html lang="de" suppressHydrationWarning>
       <body className={inter.className}>

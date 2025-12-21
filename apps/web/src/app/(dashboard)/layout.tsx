@@ -24,7 +24,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps): Rea
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="text-primary h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -32,13 +32,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps): Rea
   if (!isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="text-primary h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="bg-background flex min-h-screen">
       <Sidebar />
       <div className="flex flex-1 flex-col">
         <Header />
