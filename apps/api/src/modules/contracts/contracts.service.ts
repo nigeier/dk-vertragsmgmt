@@ -9,6 +9,7 @@ import { ContractFilterDto } from './dto/contract-filter.dto';
 import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 import { Contract, ContractStatus, ContractType, Prisma, AuditAction } from '@prisma/client';
 import { getClientIp, getUserAgent } from '../../common/utils/request.utils';
+import { PaginatedResult } from '@drykorn/shared';
 
 export interface ContractWithRelations extends Contract {
   partner: { id: string; name: string };
@@ -24,16 +25,6 @@ export interface ContractStats {
   expiringIn60Days: number;
   expiringIn90Days: number;
   totalValue: number;
-}
-
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
 }
 
 @Injectable()

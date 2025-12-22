@@ -61,6 +61,16 @@ export function AuthProvider({ children }: AuthProviderProps): React.JSX.Element
     loadUser();
   }, [loadUser]);
 
+  // Auto-Logout bei 401 Unauthorized von API
+  useEffect(() => {
+    const handleUnauthorized = (): void => {
+      setUser(null);
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
   const login = async (
     email: string,
     password: string,

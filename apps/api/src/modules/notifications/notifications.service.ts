@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 import { EmailService } from '../email/email.service';
 import { Notification } from '@prisma/client';
+import { escapeHtml } from '../../common/utils/string.utils';
 
 export interface NotificationWithEmail {
   userId: string;
@@ -131,9 +132,9 @@ export class NotificationsService {
 
       // Send generic email
       const html = `
-        <h2>${data.title}</h2>
-        <p>${data.message}</p>
-        ${data.link ? `<p><a href="${data.link}">Zum Vertrag</a></p>` : ''}
+        <h2>${escapeHtml(data.title)}</h2>
+        <p>${escapeHtml(data.message)}</p>
+        ${data.link ? `<p><a href="${escapeHtml(data.link)}">Zum Vertrag</a></p>` : ''}
       `;
 
       await this.emailService.sendGenericEmail(user.email, data.title, html);

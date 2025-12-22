@@ -49,18 +49,22 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw new Error('cleanDatabase cannot be used in production!');
     }
 
-    const tablenames = await this.$queryRaw<
-      Array<{ tablename: string }>
-    >`SELECT tablename FROM pg_tables WHERE schemaname='public'`;
+    // Sichere Variante: Tabellen einzeln über Prisma Models löschen
+    // Reihenfolge beachten wegen Foreign Keys (abhängige zuerst)
+    /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+    const prisma = this as any;
+    await this.$transaction([
+      prisma.auditLog.deleteMany(),
+      prisma.notification.deleteMany(),
+      prisma.deadline.deleteMany(),
+      prisma.document.deleteMany(),
+      prisma.contract.deleteMany(),
+      prisma.refreshToken.deleteMany(),
+      prisma.partner.deleteMany(),
+      prisma.user.deleteMany(),
+    ]);
+    /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
 
-    const tables = tablenames
-      .map(({ tablename }) => tablename)
-      .filter((name) => name !== '_prisma_migrations')
-      .map((name) => `"public"."${name}"`)
-      .join(', ');
-
-    if (tables.length > 0) {
-      await this.$executeRawUnsafe(`TRUNCATE TABLE ${tables} CASCADE;`);
-    }
+    this.logger.log('Database cleaned successfully');
   }
 }

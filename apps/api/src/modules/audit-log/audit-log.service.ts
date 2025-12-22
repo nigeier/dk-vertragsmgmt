@@ -2,19 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditLogFilterDto } from './dto/audit-log-filter.dto';
 import { AuditLog, Prisma, AuditAction } from '@prisma/client';
+import { PaginatedResult } from '@drykorn/shared';
 
 export interface AuditLogWithUser extends AuditLog {
   user: { firstName: string; lastName: string; email: string };
-}
-
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
 }
 
 @Injectable()

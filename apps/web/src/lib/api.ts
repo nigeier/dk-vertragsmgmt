@@ -42,6 +42,13 @@ class ApiClient {
         error: response.statusText,
       }));
 
+      // Auto-Logout bei 401 Unauthorized (außer bei Login/Refresh-Endpunkten)
+      if (response.status === 401 && !endpoint.includes('/auth/')) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+        }
+      }
+
       throw new Error(Array.isArray(error.message) ? error.message.join(', ') : error.message);
     }
 

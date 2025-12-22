@@ -21,6 +21,9 @@ export interface PaginatedResponse<T> {
   meta: PaginationMeta;
 }
 
+// Alias für Backend-Kompatibilität
+export type PaginatedResult<T> = PaginatedResponse<T>;
+
 export interface PaginationMeta {
   total: number;
   page: number;

@@ -5,19 +5,10 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserFilterDto } from './dto/user-filter.dto';
 import { User, Prisma, AuditAction, UserRole } from '@prisma/client';
 import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
+import { PaginatedResult } from '@drykorn/shared';
 
 export interface UserWithStats extends User {
   _count: { contracts: number; createdContracts: number };
-}
-
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
 }
 
 export interface AuditContext {

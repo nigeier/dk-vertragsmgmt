@@ -15,6 +15,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload, AuthenticatedUser, LoginContext } from '../../common/types/auth.types';
 import { UserStatus } from '@prisma/client';
+import { escapeHtml } from '../../common/utils/string.utils';
 
 @Injectable()
 export class AuthService {
@@ -478,8 +479,8 @@ export class AuthService {
             <h2>Neue Registrierung</h2>
             <p>Ein neuer Benutzer hat sich registriert und wartet auf Ihre Freigabe:</p>
             <ul>
-              <li><strong>Name:</strong> ${user.firstName} ${user.lastName}</li>
-              <li><strong>E-Mail:</strong> ${user.email}</li>
+              <li><strong>Name:</strong> ${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</li>
+              <li><strong>E-Mail:</strong> ${escapeHtml(user.email)}</li>
             </ul>
             <p><a href="${this.frontendUrl}/admin/users?status=PENDING" style="display:inline-block;padding:12px 24px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;">Registrierungen prüfen</a></p>
           `,
@@ -522,7 +523,7 @@ export class AuthService {
         'Ihr Konto wurde freigeschaltet',
         `
           <h2>Willkommen bei Drykorn Vertragsmanagement!</h2>
-          <p>Hallo ${user.firstName},</p>
+          <p>Hallo ${escapeHtml(user.firstName)},</p>
           <p>Ihr Konto wurde freigeschaltet. Sie können sich jetzt anmelden.</p>
           <p><a href="${this.frontendUrl}/login" style="display:inline-block;padding:12px 24px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;">Jetzt anmelden</a></p>
         `,
@@ -562,9 +563,9 @@ export class AuthService {
         'Ihre Registrierung wurde abgelehnt',
         `
           <h2>Registrierung abgelehnt</h2>
-          <p>Hallo ${user.firstName},</p>
+          <p>Hallo ${escapeHtml(user.firstName)},</p>
           <p>Leider wurde Ihre Registrierung abgelehnt.</p>
-          ${reason ? `<p><strong>Grund:</strong> ${reason}</p>` : ''}
+          ${reason ? `<p><strong>Grund:</strong> ${escapeHtml(reason)}</p>` : ''}
           <p>Bei Fragen wenden Sie sich bitte an den Administrator.</p>
         `,
       );

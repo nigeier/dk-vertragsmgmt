@@ -6,19 +6,10 @@ import { UpdatePartnerDto } from './dto/update-partner.dto';
 import { PartnerFilterDto } from './dto/partner-filter.dto';
 import { Partner, Prisma, AuditAction } from '@prisma/client';
 import { AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
+import { PaginatedResult } from '@drykorn/shared';
 
 export interface PartnerWithContracts extends Partner {
   _count: { contracts: number };
-}
-
-export interface PaginatedResult<T> {
-  data: T[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
 }
 
 export interface AuditContext {
