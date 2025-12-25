@@ -38,40 +38,9 @@ import {
   ContractStatus,
   CONTRACT_TYPE_LABELS,
   CONTRACT_STATUS_LABELS,
-  PartnerType,
 } from '@drykorn/shared';
 import { useToast } from '@/hooks/use-toast';
-
-interface Partner {
-  id: string;
-  name: string;
-  type: PartnerType;
-  isActive: boolean;
-}
-
-interface PartnersResponse {
-  data: Partner[];
-  meta: { total: number };
-}
-
-interface Contract {
-  id: string;
-  contractNumber: string;
-  title: string;
-  description?: string;
-  type: ContractType;
-  status: ContractStatus;
-  startDate?: string;
-  endDate?: string;
-  noticePeriodDays?: number;
-  autoRenewal: boolean;
-  value?: number;
-  currency: string;
-  paymentTerms?: string;
-  tags: string[];
-  partnerId: string;
-  partner: { id: string; name: string };
-}
+import type { ContractForEdit, PartnersResponse } from '../types';
 
 export default function EditContractPage(): React.JSX.Element {
   const params = useParams();
@@ -84,10 +53,10 @@ export default function EditContractPage(): React.JSX.Element {
   const [tags, setTags] = useState<string[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const { data: contract, isLoading: contractLoading } = useQuery<Contract>({
+  const { data: contract, isLoading: contractLoading } = useQuery<ContractForEdit>({
     queryKey: ['contract', contractId],
     queryFn: async () => {
-      const response = await api.get<Contract>(`/contracts/${contractId}`);
+      const response = await api.get<ContractForEdit>(`/contracts/${contractId}`);
       return response.data;
     },
     enabled: !!contractId,

@@ -12,8 +12,8 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
       return false;
     }
 
-    // Mindestens 8 Zeichen
-    if (password.length < 8) {
+    // Mindestens 12 Zeichen (gemäß Sicherheitsrichtlinie)
+    if (password.length < 12) {
       return false;
     }
 
@@ -41,7 +41,7 @@ export class IsStrongPasswordConstraint implements ValidatorConstraintInterface 
   }
 
   defaultMessage(): string {
-    return 'Passwort muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben, Zahlen und Sonderzeichen enthalten';
+    return 'Passwort muss mindestens 12 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben, Zahlen und Sonderzeichen enthalten';
   }
 }
 

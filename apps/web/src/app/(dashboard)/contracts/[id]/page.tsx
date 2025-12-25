@@ -69,71 +69,14 @@ import {
   X,
 } from 'lucide-react';
 import {
-  ContractType,
   ContractStatus,
   CONTRACT_TYPE_LABELS,
   CONTRACT_STATUS_LABELS,
-  ReminderType,
   REMINDER_TYPE_LABELS,
 } from '@drykorn/shared';
 import { formatDate, formatCurrency, daysUntil } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-
-interface Contract {
-  id: string;
-  contractNumber: string;
-  title: string;
-  description?: string;
-  type: ContractType;
-  status: ContractStatus;
-  startDate?: string;
-  endDate?: string;
-  noticePeriodDays?: number;
-  autoRenewal: boolean;
-  value?: number;
-  currency: string;
-  paymentTerms?: string;
-  tags: string[];
-  partner: {
-    id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-  };
-  owner: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  };
-  createdBy: {
-    id: string;
-    firstName: string;
-    lastName: string;
-  };
-  documents: Array<{
-    id: string;
-    originalName: string;
-    mimeType: string;
-    size: number;
-    createdAt: string;
-  }>;
-  reminders: Array<{
-    id: string;
-    type: ReminderType;
-    reminderDate: string;
-    isSent: boolean;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface ActiveUser {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-}
+import type { Contract, ActiveUser } from './types';
 
 export default function ContractDetailPage(): React.JSX.Element {
   const params = useParams();

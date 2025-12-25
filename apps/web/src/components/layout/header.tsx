@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Bell, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 interface Notification {
   id: string;
@@ -23,6 +24,8 @@ interface Notification {
 
 export function Header(): React.JSX.Element {
   const [searchOpen, setSearchOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: notificationCount } = useQuery<{ count: number }>({
     queryKey: ['notification-count'],
@@ -44,8 +47,15 @@ export function Header(): React.JSX.Element {
   const markAsRead = async (id: string): Promise<void> => {
     try {
       await api.patch(`/notifications/${id}/read`);
-    } catch (error) {
-      console.error('Fehler beim Markieren der Benachrichtigung als gelesen:', error);
+      // Aktualisiere die Benachrichtigungsliste
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notification-count'] });
+    } catch {
+      toast({
+        title: 'Fehler',
+        description: 'Benachrichtigung konnte nicht als gelesen markiert werden.',
+        variant: 'destructive',
+      });
     }
   };
 

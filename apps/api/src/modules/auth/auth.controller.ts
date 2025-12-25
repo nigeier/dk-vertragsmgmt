@@ -290,6 +290,7 @@ export class AuthController {
   @ApiOperation({ summary: '2FA Setup starten' })
   @ApiResponse({ status: 200, description: 'Secret und QR-Code URL' })
   @ApiResponse({ status: 409, description: '2FA bereits aktiviert' })
+  @AuditUpdate('User')
   async setupTwoFactor(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.setupTwoFactor(user.id);
   }
@@ -301,6 +302,7 @@ export class AuthController {
   @ApiOperation({ summary: '2FA aktivieren' })
   @ApiResponse({ status: 204, description: '2FA aktiviert' })
   @ApiResponse({ status: 401, description: 'Ungültiger Code' })
+  @AuditUpdate('User')
   async enableTwoFactor(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: TwoFactorCodeDto,
@@ -315,6 +317,7 @@ export class AuthController {
   @ApiOperation({ summary: '2FA deaktivieren' })
   @ApiResponse({ status: 204, description: '2FA deaktiviert' })
   @ApiResponse({ status: 401, description: 'Ungültiger Code' })
+  @AuditUpdate('User')
   async disableTwoFactor(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: TwoFactorCodeDto,
