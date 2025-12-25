@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { contractFormSchema, type ContractFormData } from '@/lib/schemas/contract.schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,37 +54,6 @@ interface PartnersResponse {
   meta: { total: number };
 }
 
-const contractSchema = z
-  .object({
-    title: z.string().min(1, 'Titel ist erforderlich').max(255, 'Maximal 255 Zeichen'),
-    description: z.string().optional(),
-    type: z.nativeEnum(ContractType),
-    status: z.nativeEnum(ContractStatus).optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    noticePeriodDays: z.number().min(0).optional(),
-    autoRenewal: z.boolean().optional(),
-    value: z.number().min(0).optional(),
-    currency: z.string().default('EUR'),
-    paymentTerms: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    partnerId: z.string().uuid('Bitte wählen Sie einen Partner'),
-  })
-  .refine(
-    (data) => {
-      if (data.startDate && data.endDate) {
-        return new Date(data.startDate) <= new Date(data.endDate);
-      }
-      return true;
-    },
-    {
-      message: 'Enddatum muss nach dem Startdatum liegen',
-      path: ['endDate'],
-    },
-  );
-
-type ContractFormData = z.infer<typeof contractSchema>;
-
 export default function NewContractPage(): React.JSX.Element {
   const router = useRouter();
   const { toast } = useToast();
@@ -106,7 +75,7 @@ export default function NewContractPage(): React.JSX.Element {
     watch,
     formState: { errors },
   } = useForm<ContractFormData>({
-    resolver: zodResolver(contractSchema),
+    resolver: zodResolver(contractFormSchema),
     defaultValues: {
       type: ContractType.SUPPLIER,
       status: ContractStatus.DRAFT,

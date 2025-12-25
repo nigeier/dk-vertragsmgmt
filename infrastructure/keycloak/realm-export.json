@@ -126,14 +126,8 @@
       "description": "Vertragsmanagement-System für Drykorn",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "http://localhost:3000/*",
-        "https://*.drykorn.local/*"
-      ],
-      "webOrigins": [
-        "http://localhost:3000",
-        "https://*.drykorn.local"
-      ],
+      "redirectUris": ["http://localhost:3000/*", "https://*.drykorn.local/*"],
+      "webOrigins": ["http://localhost:3000", "https://*.drykorn.local"],
       "publicClient": false,
       "protocol": "openid-connect",
       "standardFlowEnabled": true,
@@ -142,17 +136,8 @@
       "serviceAccountsEnabled": true,
       "authorizationServicesEnabled": false,
       "fullScopeAllowed": true,
-      "defaultClientScopes": [
-        "web-origins",
-        "roles",
-        "profile",
-        "email"
-      ],
-      "optionalClientScopes": [
-        "address",
-        "phone",
-        "offline_access"
-      ]
+      "defaultClientScopes": ["web-origins", "roles", "profile", "email"],
+      "optionalClientScopes": ["address", "phone", "offline_access"]
     }
   ],
   "requiredActions": [

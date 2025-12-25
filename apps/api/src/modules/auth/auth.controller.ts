@@ -24,7 +24,7 @@ import { RejectUserDto } from './dto/reject-user.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { AuditCreate, AuditUpdate } from '../../common/decorators/audit.decorator';
+import { AuditUpdate } from '../../common/decorators/audit.decorator';
 import { JwtAuthGuard, AuthenticatedUser } from '../../common/guards/jwt-auth.guard';
 import { getClientIp, getUserAgent } from '../../common/utils/request.utils';
 
@@ -93,21 +93,6 @@ export class AuthController {
   }
 
   // ==================== Admin User Management ====================
-
-  @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
-  @AuditCreate('User')
-  @Post('admin/users')
-  @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Benutzer direkt erstellen (Admin)' })
-  @ApiResponse({ status: 201, description: 'Benutzer erstellt und aktiviert' })
-  @ApiResponse({ status: 409, description: 'E-Mail bereits registriert' })
-  async createUserByAdmin(
-    @Body() registerDto: RegisterDto,
-    @CurrentUser() admin: AuthenticatedUser,
-  ) {
-    return this.authService.createUserByAdmin(registerDto, admin.id);
-  }
 
   @UseGuards(JwtAuthGuard)
   @Roles('ADMIN')

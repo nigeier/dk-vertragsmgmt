@@ -19,13 +19,6 @@ export interface PasswordResetEmail {
   resetUrl: string;
 }
 
-export interface WelcomeEmail {
-  to: string;
-  userName: string;
-  temporaryPassword?: string;
-  loginUrl: string;
-}
-
 export interface AccountLockedEmail {
   to: string;
   userName: string;
@@ -96,37 +89,6 @@ export class EmailService {
       this.logger.log(`Vertragsablauf-Erinnerung gesendet an ${data.to}`);
     } catch (error) {
       this.logger.error(`Fehler beim Senden der Vertragsablauf-Erinnerung an ${data.to}`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Sendet Willkommens-E-Mail für neue Benutzer
-   */
-  async sendWelcomeEmail(data: WelcomeEmail): Promise<void> {
-    const subject = 'Willkommen bei Drykorn Vertragsmanagement';
-
-    if (!this.isEnabled) {
-      this.logger.log(`[E-Mail simuliert] An: ${data.to}, Betreff: ${subject}`);
-      return;
-    }
-
-    try {
-      await this.mailerService.sendMail({
-        to: data.to,
-        subject,
-        template: 'welcome',
-        context: {
-          userName: data.userName,
-          temporaryPassword: data.temporaryPassword,
-          loginUrl: data.loginUrl || `${this.frontendUrl}/login`,
-          frontendUrl: this.frontendUrl,
-        },
-      });
-
-      this.logger.log(`Willkommens-E-Mail gesendet an ${data.to}`);
-    } catch (error) {
-      this.logger.error(`Fehler beim Senden der Willkommens-E-Mail an ${data.to}`, error);
       throw error;
     }
   }

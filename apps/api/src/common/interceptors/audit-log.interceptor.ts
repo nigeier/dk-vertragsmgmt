@@ -4,7 +4,7 @@ import { Request } from 'express';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthenticatedUser } from '../guards/jwt-auth.guard';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, Prisma } from '@prisma/client';
 import { getClientIp, getUserAgent } from '../utils/request.utils';
 
 export const AUDIT_LOG_KEY = 'auditLog';
@@ -86,8 +86,8 @@ export class AuditLogInterceptor implements NestInterceptor {
         action: metadata.action,
         entityType: metadata.entityType,
         entityId,
-        oldValue: oldValue ? structuredClone(oldValue) : undefined,
-        newValue: newValue ? structuredClone(newValue) : undefined,
+        oldValue: oldValue ? (structuredClone(oldValue) as Prisma.InputJsonValue) : undefined,
+        newValue: newValue ? (structuredClone(newValue) as Prisma.InputJsonValue) : undefined,
         ipAddress: getClientIp(request),
         userAgent: getUserAgent(request),
         userId: user.id,

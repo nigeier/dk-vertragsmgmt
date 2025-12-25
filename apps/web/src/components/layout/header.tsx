@@ -42,7 +42,11 @@ export function Header(): React.JSX.Element {
   });
 
   const markAsRead = async (id: string): Promise<void> => {
-    await api.patch(`/notifications/${id}/read`);
+    try {
+      await api.patch(`/notifications/${id}/read`);
+    } catch (error) {
+      console.error('Fehler beim Markieren der Benachrichtigung als gelesen:', error);
+    }
   };
 
   return (
@@ -60,7 +64,12 @@ export function Header(): React.JSX.Element {
             />
           </div>
         ) : (
-          <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Suche öffnen"
+          >
             <Search className="h-5 w-5" />
           </Button>
         )}
@@ -71,7 +80,12 @@ export function Header(): React.JSX.Element {
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              aria-label="Benachrichtigungen"
+            >
               <Bell className="h-5 w-5" />
               {notificationCount && notificationCount.count > 0 && (
                 <span className="bg-destructive text-destructive-foreground absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs">

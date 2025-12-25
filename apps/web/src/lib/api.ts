@@ -20,17 +20,18 @@ class ApiClient {
     options?: RequestInit,
   ): Promise<{ data: T; status: number }> {
     const url = `${this.baseUrl}${endpoint}`;
+    const isFormData = body instanceof FormData;
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    };
+    // Bei FormData: Kein Content-Type setzen (Browser setzt es mit boundary)
+    const headers: HeadersInit = isFormData
+      ? { ...options?.headers }
+      : { 'Content-Type': 'application/json', ...options?.headers };
 
     // Keine manuelle Token-Verwaltung mehr - httpOnly Cookies werden automatisch gesendet
     const response = await fetch(url, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: isFormData ? (body as FormData) : body ? JSON.stringify(body) : undefined,
       credentials: 'include', // Wichtig: Cookies werden mitgesendet
       ...options,
     });

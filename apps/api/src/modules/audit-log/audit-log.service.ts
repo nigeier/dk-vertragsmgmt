@@ -117,8 +117,12 @@ export class AuditLogService {
         action: data.action,
         entityType: data.entityType,
         entityId: data.entityId,
-        oldValue: data.oldValue ? structuredClone(data.oldValue) : undefined,
-        newValue: data.newValue ? structuredClone(data.newValue) : undefined,
+        oldValue: data.oldValue
+          ? (structuredClone(data.oldValue) as Prisma.InputJsonValue)
+          : undefined,
+        newValue: data.newValue
+          ? (structuredClone(data.newValue) as Prisma.InputJsonValue)
+          : undefined,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
         userId: data.userId,

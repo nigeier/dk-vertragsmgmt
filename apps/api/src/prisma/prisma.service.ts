@@ -49,21 +49,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       throw new Error('cleanDatabase cannot be used in production!');
     }
 
-    // Sichere Variante: Tabellen einzeln über Prisma Models löschen
+    // Tabellen einzeln über Prisma Models löschen
     // Reihenfolge beachten wegen Foreign Keys (abhängige zuerst)
-    /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
-    const prisma = this as any;
-    await this.$transaction([
-      prisma.auditLog.deleteMany(),
-      prisma.notification.deleteMany(),
-      prisma.deadline.deleteMany(),
-      prisma.document.deleteMany(),
-      prisma.contract.deleteMany(),
-      prisma.refreshToken.deleteMany(),
-      prisma.partner.deleteMany(),
-      prisma.user.deleteMany(),
-    ]);
-    /* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+    await this.$transaction(async (tx) => {
+      await tx.auditLog.deleteMany();
+      await tx.notification.deleteMany();
+      await tx.reminder.deleteMany();
+      await tx.document.deleteMany();
+      await tx.contract.deleteMany();
+      await tx.refreshToken.deleteMany();
+      await tx.partner.deleteMany();
+      await tx.contractSequence.deleteMany();
+      await tx.user.deleteMany();
+    });
 
     this.logger.log('Database cleaned successfully');
   }

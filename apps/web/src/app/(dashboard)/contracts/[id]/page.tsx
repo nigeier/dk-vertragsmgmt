@@ -216,15 +216,12 @@ export default function ContractDetailPage(): React.JSX.Element {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('file', file);
-      return api.post(
-        `/documents/upload?contractId=${contractId}&isMainDocument=${isMainDocument}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        },
-      );
+      const params = new URLSearchParams({
+        contractId,
+        isMainDocument: String(isMainDocument),
+      });
+      // Content-Type wird automatisch vom Browser gesetzt (inkl. boundary)
+      return api.post(`/documents/upload?${params.toString()}`, formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contract', contractId] });
@@ -315,9 +312,22 @@ export default function ContractDetailPage(): React.JSX.Element {
     }
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          title: 'Datei zu groß',
+          description: `Die Datei darf maximal ${MAX_FILE_SIZE / (1024 * 1024)} MB groß sein.`,
+          variant: 'destructive',
+        });
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
       setSelectedFile(file);
     }
   };

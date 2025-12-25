@@ -8,12 +8,15 @@ export interface Document {
   originalName: string;
   mimeType: string;
   size: number;
-  minioKey: string;
+  storagePath: string; // Lokaler Dateipfad
   version: number;
   isMainDocument: boolean;
   checksum: string;
   contractId: string;
   createdAt: Date;
+  // Soft Delete
+  deletedAt?: Date;
+  deletedById?: string;
 }
 
 export interface DocumentListItem {

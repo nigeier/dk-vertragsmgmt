@@ -19,9 +19,11 @@ Authorization: Bearer <access_token>
 ### Auth
 
 #### POST /auth/login
+
 Benutzer authentifizieren.
 
 **Request:**
+
 ```json
 {
   "username": "user@drykorn.de",
@@ -30,6 +32,7 @@ Benutzer authentifizieren.
 ```
 
 **Response:**
+
 ```json
 {
   "accessToken": "eyJhbG...",
@@ -39,9 +42,11 @@ Benutzer authentifizieren.
 ```
 
 #### POST /auth/refresh
+
 Access Token erneuern.
 
 **Request:**
+
 ```json
 {
   "refreshToken": "eyJhbG..."
@@ -49,9 +54,11 @@ Access Token erneuern.
 ```
 
 #### GET /auth/me
+
 Aktuellen Benutzer abrufen.
 
 **Response:**
+
 ```json
 {
   "id": "uuid",
@@ -65,6 +72,7 @@ Aktuellen Benutzer abrufen.
 ### Contracts
 
 #### GET /contracts
+
 Alle Verträge abrufen (mit Paginierung und Filter).
 
 **Query Parameter:**
@@ -80,6 +88,7 @@ Alle Verträge abrufen (mit Paginierung und Filter).
 | `sortOrder` | 'asc' \| 'desc' | Sortierrichtung |
 
 **Response:**
+
 ```json
 {
   "data": [
@@ -105,12 +114,15 @@ Alle Verträge abrufen (mit Paginierung und Filter).
 ```
 
 #### GET /contracts/:id
+
 Einzelnen Vertrag abrufen.
 
 #### POST /contracts
+
 Neuen Vertrag erstellen.
 
 **Request:**
+
 ```json
 {
   "title": "Neuer Vertrag",
@@ -124,12 +136,15 @@ Neuen Vertrag erstellen.
 ```
 
 #### PUT /contracts/:id
+
 Vertrag aktualisieren.
 
 #### PATCH /contracts/:id/status
+
 Vertragsstatus ändern.
 
 **Request:**
+
 ```json
 {
   "status": "ACTIVE"
@@ -137,12 +152,15 @@ Vertragsstatus ändern.
 ```
 
 #### DELETE /contracts/:id
+
 Vertrag löschen (nur Entwürfe).
 
 #### GET /contracts/stats
+
 Vertragsstatistiken abrufen.
 
 **Response:**
+
 ```json
 {
   "total": 150,
@@ -162,20 +180,25 @@ Vertragsstatistiken abrufen.
 ### Documents
 
 #### GET /documents/contract/:contractId
+
 Dokumente eines Vertrags abrufen.
 
 #### GET /documents/:id/download
+
 Dokument herunterladen.
 
 #### POST /documents/upload
+
 Dokument hochladen.
 
 **Request:** `multipart/form-data`
+
 - `file`: Datei
 - `contractId`: UUID
 - `isMainDocument`: boolean (optional)
 
 **Response:**
+
 ```json
 {
   "id": "uuid",
@@ -188,53 +211,67 @@ Dokument hochladen.
 ```
 
 #### DELETE /documents/:id
+
 Dokument löschen.
 
 ### Partners
 
 #### GET /partners
+
 Alle Partner abrufen.
 
 #### GET /partners/:id
+
 Partner abrufen.
 
 #### POST /partners
+
 Partner erstellen.
 
 #### PUT /partners/:id
+
 Partner aktualisieren.
 
 #### DELETE /partners/:id
+
 Partner löschen.
 
 ### Users
 
 #### GET /users
+
 Alle Benutzer abrufen (nur ADMIN/MANAGER).
 
 #### GET /users/:id
+
 Benutzer abrufen.
 
 #### PATCH /users/:id
+
 Benutzer aktualisieren.
 
 ### Notifications
 
 #### GET /notifications
+
 Benachrichtigungen abrufen.
 
 #### GET /notifications/count
+
 Anzahl ungelesener Benachrichtigungen.
 
 #### PATCH /notifications/:id/read
+
 Als gelesen markieren.
 
 #### PATCH /notifications/read-all
+
 Alle als gelesen markieren.
 
 ### Deadlines
 
 #### GET /deadlines/upcoming
+
 Anstehende Fristen abrufen.
 
 **Query Parameter:**
@@ -243,11 +280,13 @@ Anstehende Fristen abrufen.
 | `days` | number | Tage im Voraus (default: 30) |
 
 #### POST /deadlines
+
 Erinnerung erstellen.
 
 ### Audit Log
 
 #### GET /audit-log
+
 Audit-Log abrufen (nur ADMIN/MANAGER).
 
 **Query Parameter:**
@@ -275,17 +314,17 @@ Fehler werden im folgenden Format zurückgegeben:
 
 ### HTTP Status Codes
 
-| Code | Bedeutung |
-|------|-----------|
-| 200 | Erfolg |
-| 201 | Erstellt |
-| 204 | Gelöscht (kein Content) |
-| 400 | Validierungsfehler |
-| 401 | Nicht authentifiziert |
-| 403 | Keine Berechtigung |
-| 404 | Nicht gefunden |
-| 429 | Rate Limit erreicht |
-| 500 | Serverfehler |
+| Code | Bedeutung               |
+| ---- | ----------------------- |
+| 200  | Erfolg                  |
+| 201  | Erstellt                |
+| 204  | Gelöscht (kein Content) |
+| 400  | Validierungsfehler      |
+| 401  | Nicht authentifiziert   |
+| 403  | Keine Berechtigung      |
+| 404  | Nicht gefunden          |
+| 429  | Rate Limit erreicht     |
+| 500  | Serverfehler            |
 
 ## Rate Limiting
 

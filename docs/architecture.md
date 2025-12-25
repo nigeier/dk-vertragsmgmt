@@ -46,14 +46,14 @@ Das Drykorn Vertragsmanagement-System ist als Monorepo mit separaten Frontend- u
 
 ### Port-Übersicht
 
-| Service | Development | Staging | Production |
-|---------|-------------|---------|------------|
-| Frontend | localhost:3000 | :3000 | :4000 |
-| Backend API | localhost:3001 | :3001 | :4001 |
-| Keycloak | localhost:8080 | :8080 | :8080 |
-| MinIO Console | localhost:9001 | :9001 | :9001 |
-| PostgreSQL | localhost:5432 | intern | intern |
-| Redis | localhost:6379 | intern | intern |
+| Service       | Development    | Staging | Production |
+| ------------- | -------------- | ------- | ---------- |
+| Frontend      | localhost:3000 | :3000   | :4000      |
+| Backend API   | localhost:3001 | :3001   | :4001      |
+| Keycloak      | localhost:8080 | :8080   | :8080      |
+| MinIO Console | localhost:9001 | :9001   | :9001      |
+| PostgreSQL    | localhost:5432 | intern  | intern     |
+| Redis         | localhost:6379 | intern  | intern     |
 
 ## Schichtenarchitektur
 
@@ -222,6 +222,7 @@ docker compose --profile prod up -d
 ### Shared Services
 
 PostgreSQL, Redis, Keycloak und MinIO werden zwischen Staging und Prod geteilt. Für echte Trennung:
+
 - Separate Datenbanken in PostgreSQL
 - Separate MinIO Buckets
 - Separate Keycloak Realms

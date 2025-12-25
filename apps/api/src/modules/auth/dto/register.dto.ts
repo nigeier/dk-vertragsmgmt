@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsEmail, IsOptional, IsEnum } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsStrongPassword } from '../../../common/validators/password.validator';
 
@@ -9,6 +10,9 @@ export class RegisterDto {
   })
   @IsEmail({}, { message: 'Bitte gültige E-Mail-Adresse eingeben' })
   @IsNotEmpty({ message: 'E-Mail ist erforderlich' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
   email!: string;
 
   @ApiProperty({

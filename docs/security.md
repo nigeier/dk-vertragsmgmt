@@ -31,12 +31,12 @@ Sicherheit hat bei diesem System höchste Priorität. Dieses Dokument beschreibt
 
 ### Rollenbasierte Zugriffskontrolle (RBAC)
 
-| Rolle   | Beschreibung |
-|---------|-------------|
-| ADMIN   | Voller Zugriff auf alle Funktionen |
+| Rolle   | Beschreibung                                        |
+| ------- | --------------------------------------------------- |
+| ADMIN   | Voller Zugriff auf alle Funktionen                  |
 | MANAGER | Verträge erstellen, bearbeiten, genehmigen, Reports |
-| USER    | Eigene Verträge erstellen und bearbeiten |
-| VIEWER  | Nur Lesezugriff |
+| USER    | Eigene Verträge erstellen und bearbeiten            |
+| VIEWER  | Nur Lesezugriff                                     |
 
 ### Berechtigungen
 
@@ -44,19 +44,17 @@ Sicherheit hat bei diesem System höchste Priorität. Dieses Dokument beschreibt
 const PERMISSIONS = {
   ADMIN: ['*'],
   MANAGER: [
-    'contracts:read', 'contracts:write', 'contracts:approve',
-    'documents:read', 'documents:write',
-    'reports:read', 'reports:export',
-    'audit:read'
-  ],
-  USER: [
-    'contracts:read', 'contracts:write',
-    'documents:read', 'documents:write'
-  ],
-  VIEWER: [
     'contracts:read',
-    'documents:read'
-  ]
+    'contracts:write',
+    'contracts:approve',
+    'documents:read',
+    'documents:write',
+    'reports:read',
+    'reports:export',
+    'audit:read',
+  ],
+  USER: ['contracts:read', 'contracts:write', 'documents:read', 'documents:write'],
+  VIEWER: ['contracts:read', 'documents:read'],
 };
 ```
 
@@ -68,10 +66,10 @@ const PERMISSIONS = {
 // class-validator mit Whitelist-Modus
 app.useGlobalPipes(
   new ValidationPipe({
-    whitelist: true,           // Unbekannte Properties entfernen
+    whitelist: true, // Unbekannte Properties entfernen
     forbidNonWhitelisted: true, // Fehler bei unbekannten Properties
-    transform: true,            // Automatische Typenkonvertierung
-  })
+    transform: true, // Automatische Typenkonvertierung
+  }),
 );
 ```
 
@@ -114,16 +112,18 @@ app.enableCors({
 ### Security Headers (Helmet)
 
 ```typescript
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      scriptSrc: ["'self'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        scriptSrc: ["'self'"],
+      },
     },
-  },
-}));
+  }),
+);
 ```
 
 ## Datenbank-Sicherheit

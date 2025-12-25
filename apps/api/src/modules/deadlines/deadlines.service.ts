@@ -76,22 +76,24 @@ export class DeadlinesService {
 
       this.logger.log(`Found ${dueReminders.length} due reminders`);
 
-      for (const reminder of dueReminders) {
+      // Sammle IDs der erfolgreich versendeten Reminders
+      const sentReminderIds: string[] = [];
+
+      // Sende Emails parallel für bessere Performance
+      const emailPromises = dueReminders.map(async (reminder) => {
         const owner = reminder.contract.owner;
         if (!owner?.email) {
           this.logger.warn(`No owner email for contract ${reminder.contract.id}`);
-          continue;
+          return;
         }
 
         try {
-          // Calculate days until expiration
           const daysUntilExpiration = reminder.contract.endDate
             ? Math.ceil(
                 (reminder.contract.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
               )
             : 0;
 
-          // Send email
           await this.emailService.sendContractExpirationReminder({
             to: owner.email,
             userName: `${owner.firstName} ${owner.lastName}`,
@@ -102,16 +104,22 @@ export class DeadlinesService {
             contractUrl: `${this.frontendUrl}/contracts/${reminder.contract.id}`,
           });
 
-          // Mark reminder as sent
-          await this.prisma.reminder.update({
-            where: { id: reminder.id },
-            data: { isSent: true },
-          });
-
+          sentReminderIds.push(reminder.id);
           this.logger.log(`Reminder email sent for contract ${reminder.contract.contractNumber}`);
         } catch (error) {
           this.logger.error(`Failed to send reminder for ${reminder.id}: ${String(error)}`);
         }
+      });
+
+      await Promise.all(emailPromises);
+
+      // Batch-Update: Alle erfolgreichen Reminders auf einmal markieren
+      if (sentReminderIds.length > 0) {
+        await this.prisma.reminder.updateMany({
+          where: { id: { in: sentReminderIds } },
+          data: { isSent: true },
+        });
+        this.logger.log(`${sentReminderIds.length} reminders marked as sent`);
       }
 
       this.logger.log('Scheduled reminder job completed');

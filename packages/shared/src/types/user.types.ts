@@ -9,14 +9,24 @@ export enum UserRole {
   VIEWER = 'VIEWER',
 }
 
+// UserStatus: Registrierungs-Workflow
+// PENDING → ACTIVE oder REJECTED durch Admin
+export enum UserStatus {
+  PENDING = 'PENDING', // Wartet auf Admin-Freigabe
+  ACTIVE = 'ACTIVE', // Freigeschaltet
+  REJECTED = 'REJECTED', // Abgelehnt
+}
+
 export interface User {
   id: string;
-  keycloakId: string;
   email: string;
   firstName: string;
   lastName: string;
+  role: UserRole;
+  status: UserStatus;
   department?: string;
-  isActive: boolean;
+  isActive: boolean; // Temporäre Suspendierung
+  lastLoginAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,21 +37,15 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   fullName: string;
+  role: UserRole;
+  status: UserStatus;
   department?: string;
-  roles: UserRole[];
 }
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-  tokenType: string;
-}
-
+// Tokens werden via httpOnly Cookies verwaltet, nicht im Client
 export interface AuthState {
   isAuthenticated: boolean;
   user: UserProfile | null;
-  tokens: AuthTokens | null;
   isLoading: boolean;
 }
 
@@ -80,14 +84,6 @@ export const USER_ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'reports:export',
     'audit:read',
   ],
-  [UserRole.USER]: [
-    'contracts:read',
-    'contracts:write',
-    'documents:read',
-    'documents:write',
-  ],
-  [UserRole.VIEWER]: [
-    'contracts:read',
-    'documents:read',
-  ],
+  [UserRole.USER]: ['contracts:read', 'contracts:write', 'documents:read', 'documents:write'],
+  [UserRole.VIEWER]: ['contracts:read', 'documents:read'],
 };

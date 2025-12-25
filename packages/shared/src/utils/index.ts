@@ -79,7 +79,9 @@ export function generateContractNumber(sequenceNumber: number, year?: number): s
 /**
  * Parse a contract number to extract year and sequence
  */
-export function parseContractNumber(contractNumber: string): { year: number; sequence: number } | null {
+export function parseContractNumber(
+  contractNumber: string,
+): { year: number; sequence: number } | null {
   const regex = new RegExp(`^${CONTRACT_NUMBER_PREFIX}-(\\d{4})-(\\d+)$`);
   const match = contractNumber.match(regex);
   if (!match) return null;
@@ -130,10 +132,28 @@ export function generateUniqueFilename(originalName: string): string {
 }
 
 /**
- * Deep clone an object
+ * Deep clone an object (handles Date objects correctly)
  */
 export function deepClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj));
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (obj instanceof Date) {
+    return new Date(obj.getTime()) as unknown as T;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => deepClone(item)) as unknown as T;
+  }
+
+  const cloned = {} as T;
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      cloned[key] = deepClone(obj[key]);
+    }
+  }
+  return cloned;
 }
 
 /**
@@ -141,6 +161,142 @@ export function deepClone<T>(obj: T): T {
  */
 export function removeUndefined<T extends object>(obj: T): Partial<T> {
   return Object.fromEntries(
-    Object.entries(obj).filter(([, value]) => value !== undefined)
+    Object.entries(obj).filter(([, value]) => value !== undefined),
   ) as Partial<T>;
+}
+
+// ============================================
+// Validator Functions
+// ============================================
+
+/**
+ * Validate email format
+ */
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Validate UUID format (v4)
+ */
+export function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+/**
+ * Password strength requirements
+ */
+export interface PasswordStrengthResult {
+  isValid: boolean;
+  score: number; // 0-5
+  errors: string[];
+}
+
+/**
+ * Validate password strength
+ * Requirements: min 12 chars, uppercase, lowercase, number, special char
+ */
+export function validatePasswordStrength(password: string): PasswordStrengthResult {
+  const errors: string[] = [];
+  let score = 0;
+
+  if (password.length >= 12) {
+    score++;
+  } else {
+    errors.push('Passwort muss mindestens 12 Zeichen haben');
+  }
+
+  if (/[A-Z]/.test(password)) {
+    score++;
+  } else {
+    errors.push('Passwort muss mindestens einen Großbuchstaben enthalten');
+  }
+
+  if (/[a-z]/.test(password)) {
+    score++;
+  } else {
+    errors.push('Passwort muss mindestens einen Kleinbuchstaben enthalten');
+  }
+
+  if (/\d/.test(password)) {
+    score++;
+  } else {
+    errors.push('Passwort muss mindestens eine Zahl enthalten');
+  }
+
+  if (/[!@#$%^&*(),.?":{}|<>_\-+=[\]\\\/`~';]/.test(password)) {
+    score++;
+  } else {
+    errors.push('Passwort muss mindestens ein Sonderzeichen enthalten');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    score,
+    errors,
+  };
+}
+
+/**
+ * Validate German phone number format
+ */
+export function isValidPhoneNumber(phone: string): boolean {
+  // Accepts formats like: +49 123 456789, 0123-456789, +49(0)123/4567890
+  const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
+  const cleanedPhone = phone.replace(/\s/g, '');
+  return phoneRegex.test(cleanedPhone) && cleanedPhone.length >= 6 && cleanedPhone.length <= 20;
+}
+
+/**
+ * Validate IBAN format (basic check)
+ */
+export function isValidIBAN(iban: string): boolean {
+  const cleanedIban = iban.replace(/\s/g, '').toUpperCase();
+  const ibanRegex = /^[A-Z]{2}\d{2}[A-Z0-9]{4,30}$/;
+  return ibanRegex.test(cleanedIban);
+}
+
+/**
+ * Check if string is empty or only whitespace
+ */
+export function isBlank(str: string | null | undefined): boolean {
+  return !str || str.trim().length === 0;
+}
+
+/**
+ * Check if string is not empty and not only whitespace
+ */
+export function isNotBlank(str: string | null | undefined): boolean {
+  return !isBlank(str);
+}
+
+/**
+ * Normalize email address (lowercase + trim)
+ */
+export function normalizeEmail(email: string): string {
+  return email.toLowerCase().trim();
+}
+
+/**
+ * Format German phone number for display
+ */
+export function formatPhoneNumber(phone: string): string {
+  const cleaned = phone.replace(/[^\d+]/g, '');
+
+  // German format: +49 XXX XXXXXXX
+  if (cleaned.startsWith('+49')) {
+    const rest = cleaned.slice(3);
+    if (rest.length >= 10) {
+      return `+49 ${rest.slice(0, 3)} ${rest.slice(3)}`;
+    }
+  }
+
+  // German format: 0XXX XXXXXXX
+  if (cleaned.startsWith('0') && cleaned.length >= 10) {
+    return `${cleaned.slice(0, 4)} ${cleaned.slice(4)}`;
+  }
+
+  return phone;
 }

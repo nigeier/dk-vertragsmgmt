@@ -5,9 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { contractFormSchema, type ContractFormData } from '@/lib/schemas/contract.schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -73,37 +73,6 @@ interface Contract {
   partner: { id: string; name: string };
 }
 
-const contractSchema = z
-  .object({
-    title: z.string().min(1, 'Titel ist erforderlich').max(255, 'Maximal 255 Zeichen'),
-    description: z.string().optional(),
-    type: z.nativeEnum(ContractType),
-    status: z.nativeEnum(ContractStatus).optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    noticePeriodDays: z.number().min(0).optional().nullable(),
-    autoRenewal: z.boolean().optional(),
-    value: z.number().min(0).optional().nullable(),
-    currency: z.string().default('EUR'),
-    paymentTerms: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    partnerId: z.string().uuid('Bitte wählen Sie einen Partner'),
-  })
-  .refine(
-    (data) => {
-      if (data.startDate && data.endDate) {
-        return new Date(data.startDate) <= new Date(data.endDate);
-      }
-      return true;
-    },
-    {
-      message: 'Enddatum muss nach dem Startdatum liegen',
-      path: ['endDate'],
-    },
-  );
-
-type ContractFormData = z.infer<typeof contractSchema>;
-
 export default function EditContractPage(): React.JSX.Element {
   const params = useParams();
   const router = useRouter();
@@ -140,7 +109,7 @@ export default function EditContractPage(): React.JSX.Element {
     reset,
     formState: { errors, isDirty },
   } = useForm<ContractFormData>({
-    resolver: zodResolver(contractSchema),
+    resolver: zodResolver(contractFormSchema),
   });
 
   // Initialize form with contract data

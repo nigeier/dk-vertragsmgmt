@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
@@ -12,6 +13,10 @@ async function bootstrap(): Promise<void> {
   });
 
   const configService = app.get(ConfigService);
+
+  // Request Body Size Limits (Security: prevent large payload attacks)
+  app.use(json({ limit: '1mb' }));
+  app.use(urlencoded({ limit: '1mb', extended: true }));
 
   // Cookie Parser für httpOnly Cookie Auth
   app.use(cookieParser());

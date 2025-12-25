@@ -4,11 +4,11 @@
 
 Das System ist für **internes Netzwerk** konzipiert - kein Internetzugang erforderlich.
 
-| Umgebung | Methode | Ports |
-|----------|---------|-------|
-| Development | Lokal (ohne Docker) | 3000, 3001 |
-| Staging | Docker Compose | 3000, 3001, 8080, 9001 |
-| Production | Docker Compose | 4000, 4001, 8080, 9001 |
+| Umgebung    | Methode             | Ports                  |
+| ----------- | ------------------- | ---------------------- |
+| Development | Lokal (ohne Docker) | 3000, 3001             |
+| Staging     | Docker Compose      | 3000, 3001, 8080, 9001 |
+| Production  | Docker Compose      | 4000, 4001, 8080, 9001 |
 
 ## Architektur (vereinfacht)
 
@@ -141,6 +141,7 @@ docker compose --profile staging logs -f api-staging
 ```
 
 **Zugriff:**
+
 - Frontend: `http://192.168.1.100:3000`
 - API: `http://192.168.1.100:3001`
 - Keycloak: `http://192.168.1.100:8080`
@@ -160,6 +161,7 @@ docker compose --profile prod logs -f
 ```
 
 **Zugriff:**
+
 - Frontend: `http://192.168.1.100:4000`
 - API: `http://192.168.1.100:4001`
 - Keycloak: `http://192.168.1.100:8080`
@@ -180,16 +182,17 @@ docker compose --profile prod up -d --build
 docker compose --profile staging --profile prod down
 ```
 
-| Service | Staging | Production |
-|---------|---------|------------|
-| Frontend | :3000 | :4000 |
-| API | :3001 | :4001 |
-| Keycloak | :8080 (geteilt) | :8080 (geteilt) |
-| MinIO | :9001 (geteilt) | :9001 (geteilt) |
+| Service    | Staging          | Production       |
+| ---------- | ---------------- | ---------------- |
+| Frontend   | :3000            | :4000            |
+| API        | :3001            | :4001            |
+| Keycloak   | :8080 (geteilt)  | :8080 (geteilt)  |
+| MinIO      | :9001 (geteilt)  | :9001 (geteilt)  |
 | PostgreSQL | intern (geteilt) | intern (geteilt) |
-| Redis | intern (geteilt) | intern (geteilt) |
+| Redis      | intern (geteilt) | intern (geteilt) |
 
 **Hinweis:** Für echte Trennung separate Datenbanken in PostgreSQL erstellen:
+
 - `drykorn_contracts_staging`
 - `drykorn_contracts_prod`
 
@@ -293,6 +296,7 @@ docker compose --profile prod run --rm api-prod sh
 ### Datenbank-Verbindung fehlgeschlagen
 
 1. Postgres-Container läuft?
+
    ```bash
    docker compose --profile prod ps postgres
    ```

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,7 +50,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Plus,
   Search,
   Users,
   ChevronLeft,
@@ -213,12 +211,6 @@ export default function UsersPage(): React.JSX.Element {
           <h1 className="text-3xl font-bold">Benutzerverwaltung</h1>
           <p className="text-muted-foreground">Verwalten Sie Benutzer und deren Berechtigungen</p>
         </div>
-        <Link href="/admin/users/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Neuer Benutzer
-          </Button>
-        </Link>
       </div>
 
       <Card>
@@ -393,14 +385,9 @@ export default function UsersPage(): React.JSX.Element {
               <Users className="text-muted-foreground h-12 w-12" />
               <h3 className="mt-4 text-lg font-medium">Keine Benutzer gefunden</h3>
               <p className="text-muted-foreground mt-1">
-                Erstellen Sie einen neuen Benutzer oder ändern Sie Ihre Filterkriterien.
+                Benutzer können sich über die Registrierungsseite anmelden und werden dann hier
+                angezeigt.
               </p>
-              <Link href="/admin/users/new" className="mt-4">
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Neuer Benutzer
-                </Button>
-              </Link>
             </div>
           )}
         </CardContent>

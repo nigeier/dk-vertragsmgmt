@@ -197,7 +197,9 @@ export class ContractsService {
         currency: dto.currency || 'EUR',
         paymentTerms: dto.paymentTerms,
         tags: dto.tags || [],
-        customFields: dto.customFields ? structuredClone(dto.customFields) : undefined,
+        customFields: dto.customFields
+          ? (structuredClone(dto.customFields) as Prisma.InputJsonValue)
+          : undefined,
         partnerId: dto.partnerId,
         ownerId: dto.ownerId || user.id,
         createdById: user.id,
@@ -262,7 +264,9 @@ export class ContractsService {
         currency: dto.currency,
         paymentTerms: dto.paymentTerms,
         tags: dto.tags,
-        customFields: dto.customFields ? structuredClone(dto.customFields) : undefined,
+        customFields: dto.customFields
+          ? (structuredClone(dto.customFields) as Prisma.InputJsonValue)
+          : undefined,
         partnerId: dto.partnerId,
         ownerId: dto.ownerId,
       },

@@ -5,6 +5,7 @@ Sicherheitskritisches Vertragsmanagement-System für Drykorn. On-premise gehoste
 ## Tech-Stack
 
 ### Frontend
+
 - **Next.js 14+** (App Router)
 - **TypeScript** (strict mode)
 - **Tailwind CSS**
@@ -13,6 +14,7 @@ Sicherheitskritisches Vertragsmanagement-System für Drykorn. On-premise gehoste
 - **React Hook Form + Zod** für Formulare
 
 ### Backend
+
 - **NestJS**
 - **TypeScript** (strict mode)
 - **Prisma** ORM
@@ -20,6 +22,7 @@ Sicherheitskritisches Vertragsmanagement-System für Drykorn. On-premise gehoste
 - **Swagger/OpenAPI** Dokumentation
 
 ### Infrastruktur
+
 - **PostgreSQL 18**
 - **Redis** (Sessions & Cache)
 - **MinIO** (Dokumentenspeicher)
@@ -109,25 +112,25 @@ docker compose --profile prod ps
 
 ### Port-Übersicht
 
-| Service | Staging | Production |
-|---------|---------|------------|
-| Frontend | :3000 | :4000 |
-| API | :3001 | :4001 |
-| Keycloak | :8080 | :8080 |
-| MinIO Console | :9001 | :9001 |
+| Service       | Staging | Production |
+| ------------- | ------- | ---------- |
+| Frontend      | :3000   | :4000      |
+| API           | :3001   | :4001      |
+| Keycloak      | :8080   | :8080      |
+| MinIO Console | :9001   | :9001      |
 
 ## Verfügbare Scripts
 
-| Script | Beschreibung |
-|--------|-------------|
-| `npm run dev` | Startet Frontend |
-| `npm run dev:all` | Startet Frontend und Backend parallel |
-| `npm run build` | Baut alle Anwendungen |
-| `npm run lint` | Führt ESLint aus |
-| `npm run test` | Führt Tests aus |
-| `npm run db:migrate` | Führt Prisma-Migrationen aus |
-| `npm run db:seed` | Fügt Seed-Daten ein |
-| `npm run db:studio` | Öffnet Prisma Studio |
+| Script               | Beschreibung                          |
+| -------------------- | ------------------------------------- |
+| `npm run dev`        | Startet Frontend                      |
+| `npm run dev:all`    | Startet Frontend und Backend parallel |
+| `npm run build`      | Baut alle Anwendungen                 |
+| `npm run lint`       | Führt ESLint aus                      |
+| `npm run test`       | Führt Tests aus                       |
+| `npm run db:migrate` | Führt Prisma-Migrationen aus          |
+| `npm run db:seed`    | Fügt Seed-Daten ein                   |
+| `npm run db:studio`  | Öffnet Prisma Studio                  |
 
 ## Sicherheit
 
@@ -142,6 +145,7 @@ docker compose --profile prod ps
 ## API-Dokumentation
 
 Im Entwicklungsmodus ist Swagger verfügbar unter:
+
 - Lokal: `http://localhost:3001/api/docs`
 - Staging: `http://<SERVER_IP>:3001/api/docs`
 - Prod: `http://<SERVER_IP>:4001/api/docs`

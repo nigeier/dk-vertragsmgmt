@@ -393,55 +393,6 @@ export class AuthService {
   }
 
   /**
-   * Admin creates a user directly (Status: ACTIVE)
-   */
-  async createUserByAdmin(
-    registerDto: RegisterDto,
-    adminId: string,
-  ): Promise<{ id: string; email: string }> {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: registerDto.email.toLowerCase() },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('E-Mail-Adresse ist bereits registriert');
-    }
-
-    const passwordHash = await bcrypt.hash(registerDto.password, this.SALT_ROUNDS);
-
-    const user = await this.prisma.user.create({
-      data: {
-        email: registerDto.email.toLowerCase(),
-        passwordHash,
-        firstName: registerDto.firstName,
-        lastName: registerDto.lastName,
-        role: registerDto.role || 'USER',
-        status: UserStatus.ACTIVE, // Direct activation by admin
-        department: registerDto.department,
-      },
-    });
-
-    this.logger.log(`Benutzer ${user.email} erstellt von Admin ${adminId}`);
-
-    // Send welcome email with password
-    try {
-      await this.emailService.sendWelcomeEmail({
-        to: user.email,
-        userName: `${user.firstName} ${user.lastName}`,
-        temporaryPassword: registerDto.password,
-        loginUrl: `${this.frontendUrl}/login`,
-      });
-    } catch (emailError) {
-      this.logger.error(`Failed to send welcome email: ${String(emailError)}`);
-    }
-
-    return {
-      id: user.id,
-      email: user.email,
-    };
-  }
-
-  /**
    * Notify all admins about a new pending registration
    */
   private async notifyAdminsOfNewRegistration(user: {
@@ -460,30 +411,40 @@ export class AuthService {
         select: { id: true, email: true, firstName: true, lastName: true },
       });
 
-      // Create in-app notification for each admin
-      for (const admin of admins) {
-        await this.prisma.notification.create({
-          data: {
+      // Batch-Create: In-App Notifications für alle Admins auf einmal
+      if (admins.length > 0) {
+        await this.prisma.notification.createMany({
+          data: admins.map((admin) => ({
             userId: admin.id,
             title: 'Neue Benutzerregistrierung',
             message: `${user.firstName} ${user.lastName} (${user.email}) hat sich registriert und wartet auf Freigabe.`,
             link: '/admin/users?status=PENDING',
-          },
+          })),
         });
 
-        // Send email to admin
-        await this.emailService.sendGenericEmail(
-          admin.email,
-          'Neue Benutzerregistrierung wartet auf Freigabe',
-          `
-            <h2>Neue Registrierung</h2>
-            <p>Ein neuer Benutzer hat sich registriert und wartet auf Ihre Freigabe:</p>
-            <ul>
-              <li><strong>Name:</strong> ${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</li>
-              <li><strong>E-Mail:</strong> ${escapeHtml(user.email)}</li>
-            </ul>
-            <p><a href="${this.frontendUrl}/admin/users?status=PENDING" style="display:inline-block;padding:12px 24px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;">Registrierungen prüfen</a></p>
-          `,
+        // Emails parallel senden
+        const emailHtml = `
+          <h2>Neue Registrierung</h2>
+          <p>Ein neuer Benutzer hat sich registriert und wartet auf Ihre Freigabe:</p>
+          <ul>
+            <li><strong>Name:</strong> ${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}</li>
+            <li><strong>E-Mail:</strong> ${escapeHtml(user.email)}</li>
+          </ul>
+          <p><a href="${this.frontendUrl}/admin/users?status=PENDING" style="display:inline-block;padding:12px 24px;background:#1a1a2e;color:#fff;text-decoration:none;border-radius:6px;">Registrierungen prüfen</a></p>
+        `;
+
+        await Promise.all(
+          admins.map((admin) =>
+            this.emailService
+              .sendGenericEmail(
+                admin.email,
+                'Neue Benutzerregistrierung wartet auf Freigabe',
+                emailHtml,
+              )
+              .catch((err) =>
+                this.logger.error(`Failed to email admin ${admin.email}: ${String(err)}`),
+              ),
+          ),
         );
       }
 
