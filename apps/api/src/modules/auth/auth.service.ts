@@ -16,16 +16,19 @@ import { RegisterDto } from './dto/register.dto';
 import { JwtPayload, AuthenticatedUser, LoginContext } from '../../common/types/auth.types';
 import { UserStatus } from '@prisma/client';
 import { escapeHtml } from '../../common/utils/string.utils';
+import {
+  BCRYPT_SALT_ROUNDS,
+  MAX_LOGIN_ATTEMPTS,
+  MAX_2FA_ATTEMPTS,
+  ACCOUNT_LOCKOUT_MINUTES,
+  TWO_FACTOR_LOCKOUT_MINUTES,
+  REFRESH_TOKEN_EXPIRY_DAYS,
+  ACCESS_TOKEN_EXPIRY_SECONDS,
+} from '@drykorn/shared';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private readonly SALT_ROUNDS = 12;
-  private readonly MAX_LOGIN_ATTEMPTS = 5;
-  private readonly MAX_2FA_ATTEMPTS = 5;
-  private readonly LOCKOUT_DURATION_MINUTES = 15;
-  private readonly TWO_FACTOR_LOCKOUT_MINUTES = 10;
-  private readonly REFRESH_TOKEN_EXPIRY_DAYS = 7;
   private readonly frontendUrl: string;
 
   constructor(
@@ -134,7 +137,7 @@ export class AuthService {
       }
     }
 
-    const expiresIn = 900; // 15 Minuten
+    const expiresIn = ACCESS_TOKEN_EXPIRY_SECONDS;
 
     const payload: JwtPayload = {
       sub: user.id,
@@ -179,7 +182,7 @@ export class AuthService {
 
     // Calculate expiry date
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + this.REFRESH_TOKEN_EXPIRY_DAYS);
+    expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS);
 
     // Store in database
     await this.prisma.refreshToken.create({
@@ -195,7 +198,7 @@ export class AuthService {
     // Create JWT wrapper for the token (contains reference to DB token)
     const refreshJwt = this.jwtService.sign(
       { sub: userId, token: tokenValue, type: 'refresh' },
-      { expiresIn: `${this.REFRESH_TOKEN_EXPIRY_DAYS}d` },
+      { expiresIn: `${REFRESH_TOKEN_EXPIRY_DAYS}d` },
     );
 
     return refreshJwt;
@@ -243,8 +246,8 @@ export class AuthService {
       `Fehlgeschlagener Login-Versuch #${attempts} für ${email} von IP: ${ipAddress}`,
     );
 
-    if (attempts >= this.MAX_LOGIN_ATTEMPTS) {
-      const lockUntil = new Date(Date.now() + this.LOCKOUT_DURATION_MINUTES * 60 * 1000);
+    if (attempts >= MAX_LOGIN_ATTEMPTS) {
+      const lockUntil = new Date(Date.now() + ACCOUNT_LOCKOUT_MINUTES * 60 * 1000);
 
       const lockedUser = await this.prisma.user.update({
         where: { id: userId },
@@ -253,14 +256,14 @@ export class AuthService {
       });
 
       this.logger.warn(
-        `Account ${email} wurde für ${this.LOCKOUT_DURATION_MINUTES} Minuten gesperrt nach ${attempts} fehlgeschlagenen Versuchen`,
+        `Account ${email} wurde für ${ACCOUNT_LOCKOUT_MINUTES} Minuten gesperrt nach ${attempts} fehlgeschlagenen Versuchen`,
       );
 
       try {
         await this.emailService.sendAccountLockedEmail({
           to: email,
           userName: `${lockedUser.firstName} ${lockedUser.lastName}`,
-          lockDurationMinutes: this.LOCKOUT_DURATION_MINUTES,
+          lockDurationMinutes: ACCOUNT_LOCKOUT_MINUTES,
           ipAddress: ipAddress || 'Unbekannt',
         });
       } catch (emailError) {
@@ -340,8 +343,8 @@ export class AuthService {
     const attempts = updated.twoFactorFailedAttempts;
     this.logger.warn(`Fehlgeschlagener 2FA-Versuch #${attempts} für ${email}`);
 
-    if (attempts >= this.MAX_2FA_ATTEMPTS) {
-      const lockUntil = new Date(Date.now() + this.TWO_FACTOR_LOCKOUT_MINUTES * 60 * 1000);
+    if (attempts >= MAX_2FA_ATTEMPTS) {
+      const lockUntil = new Date(Date.now() + TWO_FACTOR_LOCKOUT_MINUTES * 60 * 1000);
 
       await this.prisma.user.update({
         where: { id: userId },
@@ -349,7 +352,7 @@ export class AuthService {
       });
 
       this.logger.warn(
-        `2FA für ${email} wurde für ${this.TWO_FACTOR_LOCKOUT_MINUTES} Minuten gesperrt nach ${attempts} fehlgeschlagenen Versuchen`,
+        `2FA für ${email} wurde für ${TWO_FACTOR_LOCKOUT_MINUTES} Minuten gesperrt nach ${attempts} fehlgeschlagenen Versuchen`,
       );
     }
   }
@@ -366,7 +369,7 @@ export class AuthService {
       throw new ConflictException('E-Mail-Adresse ist bereits registriert');
     }
 
-    const passwordHash = await bcrypt.hash(registerDto.password, this.SALT_ROUNDS);
+    const passwordHash = await bcrypt.hash(registerDto.password, BCRYPT_SALT_ROUNDS);
 
     const user = await this.prisma.user.create({
       data: {
@@ -621,7 +624,7 @@ export class AuthService {
         context.userAgent,
       );
 
-      const expiresIn = 900; // 15 Minuten
+      const expiresIn = ACCESS_TOKEN_EXPIRY_SECONDS;
 
       const newPayload: JwtPayload = {
         sub: user.id,
@@ -688,7 +691,7 @@ export class AuthService {
       throw new UnauthorizedException('Aktuelles Passwort ist falsch');
     }
 
-    const newPasswordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
 
     await this.prisma.user.update({
       where: { id: userId },

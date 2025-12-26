@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -39,11 +40,13 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ default: { ttl: 60000, limit: 5 } }) // 5 Login-Versuche pro Minute
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Benutzer anmelden' })
   @ApiResponse({ status: 200, description: 'Anmeldung erfolgreich' })
   @ApiResponse({ status: 401, description: 'Ungültige Anmeldedaten' })
   @ApiResponse({ status: 403, description: 'Konto gesperrt oder wartend' })
+  @ApiResponse({ status: 429, description: 'Zu viele Anfragen' })
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
@@ -85,9 +88,11 @@ export class AuthController {
 
   @Public()
   @Post('register')
+  @Throttle({ default: { ttl: 60000, limit: 3 } }) // 3 Registrierungen pro Minute
   @ApiOperation({ summary: 'Selbstregistrierung (wartet auf Admin-Freigabe)' })
   @ApiResponse({ status: 201, description: 'Registrierung eingereicht' })
   @ApiResponse({ status: 409, description: 'E-Mail bereits registriert' })
+  @ApiResponse({ status: 429, description: 'Zu viele Anfragen' })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
@@ -143,10 +148,12 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
+  @Throttle({ default: { ttl: 60000, limit: 10 } }) // 10 Refresh-Versuche pro Minute
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Access Token erneuern (mit Token-Rotation)' })
   @ApiResponse({ status: 200, description: 'Token erneuert' })
   @ApiResponse({ status: 401, description: 'Ungültiger Refresh-Token' })
+  @ApiResponse({ status: 429, description: 'Zu viele Anfragen' })
   async refresh(
     @Body() refreshTokenDto: RefreshTokenDto,
     @Req() req: Request,

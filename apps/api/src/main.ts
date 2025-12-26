@@ -8,8 +8,14 @@ import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
+  // Production: nur error, warn, log - Development: alle Level
+  const isProduction = process.env.NODE_ENV === 'production';
+  const logLevels: ('error' | 'warn' | 'log' | 'debug' | 'verbose')[] = isProduction
+    ? ['error', 'warn', 'log']
+    : ['error', 'warn', 'log', 'debug', 'verbose'];
+
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger: logLevels,
   });
 
   const configService = app.get(ConfigService);

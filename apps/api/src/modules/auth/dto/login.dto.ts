@@ -17,11 +17,11 @@ export class LoginDto {
   @ApiProperty({
     description: 'Passwort',
     example: 'SicheresPasswort123!',
-    minLength: 8,
+    minLength: 12,
   })
   @IsString()
   @IsNotEmpty({ message: 'Passwort ist erforderlich' })
-  @MinLength(8, { message: 'Passwort muss mindestens 8 Zeichen haben' })
+  @MinLength(12, { message: 'Passwort muss mindestens 12 Zeichen haben' })
   password!: string;
 
   @ApiPropertyOptional({
