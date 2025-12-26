@@ -109,6 +109,12 @@ class ApiClient {
       throw new Error(error.message);
     }
 
+    // Validate response is actually a file, not an error page
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      throw new Error('Download fehlgeschlagen: Ungültige Server-Antwort');
+    }
+
     return response.blob();
   }
 
